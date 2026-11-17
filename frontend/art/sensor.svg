@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800"><defs>
+<linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2F4F7"/><stop offset=".45" stop-color="#C5CBD3"/><stop offset="1" stop-color="#8E96A2"/></linearGradient>
+<linearGradient id="metalV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEF1F4"/><stop offset=".5" stop-color="#BFC5CE"/><stop offset="1" stop-color="#7F8794"/></linearGradient>
+<linearGradient id="metalH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8E96A2"/><stop offset=".35" stop-color="#E9ECF0"/><stop offset=".6" stop-color="#C5CBD3"/><stop offset="1" stop-color="#7F8794"/></linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#454B55"/><stop offset="1" stop-color="#1E2228"/></linearGradient>
+<linearGradient id="darkH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1E2228"/><stop offset=".4" stop-color="#4A515C"/><stop offset="1" stop-color="#1E2228"/></linearGradient>
+<linearGradient id="blue" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#16289A"/><stop offset=".38" stop-color="#3D58F0"/><stop offset="1" stop-color="#15259A"/></linearGradient>
+<linearGradient id="yellow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#C98F00"/><stop offset=".4" stop-color="#FFD24D"/><stop offset="1" stop-color="#B98200"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7FAFD"/><stop offset=".5" stop-color="#D5E0EC"/><stop offset="1" stop-color="#AEBFD2"/></linearGradient>
+<linearGradient id="ceramic" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#D9DCE1"/><stop offset=".4" stop-color="#FFFFFF"/><stop offset="1" stop-color="#C9CDD4"/></linearGradient>
+<linearGradient id="friction" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6E6458"/><stop offset="1" stop-color="#4A433B"/></linearGradient>
+<radialGradient id="shadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#0B1020" stop-opacity=".22"/><stop offset="1" stop-color="#0B1020" stop-opacity="0"/></radialGradient>
+</defs><ellipse cx="400" cy="660" rx="200" ry="26" fill="url(#shadow)"/>
+<g transform="translate(400 380) rotate(-30)">
+ <rect x="-50" y="-210" width="100" height="120" rx="14" fill="url(#dark)"/>
+ <rect x="-34" y="-196" width="68" height="40" rx="6" fill="#4A515C"/>
+ <path d="M-64 -90 h128 l-14 60 h-100 z" fill="url(#metalH)"/>
+ <rect x="-30" y="-30" width="60" height="150" fill="url(#metalH)"/>
+ <path d="M-30 -20 L30 -12" stroke="#6B7280" stroke-width="5"/><path d="M-30 -4 L30 4" stroke="#6B7280" stroke-width="5"/><path d="M-30 12 L30 20" stroke="#6B7280" stroke-width="5"/><path d="M-30 28 L30 36" stroke="#6B7280" stroke-width="5"/><path d="M-30 44 L30 52" stroke="#6B7280" stroke-width="5"/><path d="M-30 60 L30 68" stroke="#6B7280" stroke-width="5"/><path d="M-30 76 L30 84" stroke="#6B7280" stroke-width="5"/><path d="M-30 92 L30 100" stroke="#6B7280" stroke-width="5"/>
+ <rect x="-16" y="120" width="32" height="60" rx="8" fill="#5B636F"/>
+ <path d="M0 -210 C0 -320 160 -300 200 -380" stroke="#1E2228" stroke-width="18" fill="none" stroke-linecap="round"/>
+ <rect x="184" y="-430" width="70" height="56" rx="10" fill="#FFC21A" transform="rotate(30 219 -402)"/>
+</g></svg>

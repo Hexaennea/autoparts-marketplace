@@ -1,0 +1,28 @@
+# Local production-like run: docker compose up --build  →  http://localhost:8000
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: partpilot
+      POSTGRES_PASSWORD: partpilot
+      POSTGRES_DB: partpilot
+    volumes: ["partpilot-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U partpilot"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+  app:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://partpilot:partpilot@db:5432/partpilot
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes: ["partpilot-data:/data"]
+    restart: unless-stopped
+volumes:
+  partpilot-db:
+  partpilot-data:

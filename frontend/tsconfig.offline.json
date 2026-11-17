@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": [
+    "src",
+    "src/types/offline/*.d.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
+}

@@ -1,0 +1,123 @@
+/* PartPilot design tokens — "Showroom".
+   A monochrome, automotive-showroom finish: pure white floors, black chrome for the header,
+   footer and portal rail, hairline silver rules, black for every action, a thin display face.
+   One steel blue is kept for focus and inline links; green still means "fits your car". */
+
+@font-face { font-family: "Inter"; font-weight: 400; font-style: normal; font-display: swap; src: url("../assets/fonts/Inter-Regular.woff") format("woff"); }
+@font-face { font-family: "Inter"; font-weight: 500; font-style: normal; font-display: swap; src: url("../assets/fonts/Inter-Medium.woff") format("woff"); }
+@font-face { font-family: "Inter"; font-weight: 600; font-style: normal; font-display: swap; src: url("../assets/fonts/Inter-SemiBold.woff") format("woff"); }
+@font-face { font-family: "Inter"; font-weight: 700; font-style: normal; font-display: swap; src: url("../assets/fonts/Inter-Bold.woff") format("woff"); }
+@font-face { font-family: "Inter Display"; font-weight: 300; font-style: normal; font-display: swap; src: url("../assets/fonts/InterDisplay-Light.woff") format("woff"); }
+@font-face { font-family: "PartPilot Serif"; font-weight: 400; font-style: normal; font-display: swap; src: url("../assets/fonts/Pagella-Regular.woff") format("woff"); }
+@font-face { font-family: "PartPilot Serif"; font-weight: 400; font-style: italic; font-display: swap; src: url("../assets/fonts/Pagella-Italic.woff") format("woff"); }
+@font-face { font-family: "Inter Display"; font-weight: 600; font-style: normal; font-display: swap; src: url("../assets/fonts/InterDisplay-SemiBold.woff") format("woff"); }
+
+:root {
+  /* floors + surfaces */
+  --page: #ffffff;
+  --shelf: #f4f4f5;
+  --shelf-2: #ebebed;
+  --label: #ffffff;
+  --label-sunk: #fafafa;
+  --art-ground: #f3f5f7;       /* matches the product photo backdrop exactly */
+  --field: #f4f4f5;
+
+  /* ink */
+  --ink: #0b0b0c;
+  --ink-2: #3c3c41;
+  --ink-3: #66666c;
+  --ink-placeholder: #77777d;
+  --ink-inverse: #ffffff;
+  --rule: #e6e6e8;
+  --rule-strong: #cdcdd1;
+
+  /* action: black chrome */
+  --band: #0b0b0c;
+  --band-hover: #2b2b30;
+  --band-press: #000000;
+  --band-50: #f4f4f5;
+  --band-100: #e8e8ea;
+  --band-200: #d4d4d8;
+  --band-ink: #0b0b0c;
+
+  /* steel blue: focus rings and inline links only */
+  --accent: #1a6ed8;
+  --accent-soft: #e8f1fc;
+
+  /* night: header, footer, rail, hero */
+  --navy: #000000;
+  --navy-2: #121214;
+  --navy-3: #1f1f23;
+  --navy-ink: #f2f2f3;
+  --navy-ink-2: #a1a1a8;
+  --navy-rule: rgba(255, 255, 255, 0.12);
+  --silver: #c8cbd0;
+  --hero-gradient: linear-gradient(180deg, #121214 0%, #000 100%);
+
+  /* warm accent — ratings only */
+  --sticker: #c99a3d;
+  --sticker-deep: #b8892c;
+  --sticker-soft: #faf4e8;
+  --sticker-ink: #2a1f08;
+
+  /* state */
+  --ok: #157347;
+  --ok-soft: #ecf6f0;
+  --ok-ring: #c5e3d1;
+  --warn: #9a5800;
+  --warn-soft: #fbf3e6;
+  --bad: #b42318;
+  --bad-soft: #fcefee;
+  --info: var(--accent);
+  --info-soft: var(--accent-soft);
+
+  /* legacy names used by components */
+  --carton: var(--navy);
+  --carton-2: var(--navy-2);
+  --carton-3: var(--navy-3);
+  --carton-ink: var(--navy-ink);
+  --carton-ink-2: var(--navy-ink-2);
+
+  /* type */
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Inter Display", "Inter", system-ui, sans-serif;
+  /* headlines: a classical serif (TeX Gyre Pagella, GUST Font License); numbers stay in --font-display */
+  --font-serif: "PartPilot Serif", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --fs-micro: 0.6875rem;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.0625rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.625rem;
+  --fs-3xl: 2.125rem;
+  --fs-4xl: 2.75rem;
+  --track-label: 0.14em;
+
+  /* space (4px base) */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px; --s12: 48px; --s16: 64px; --s20: 80px; --s24: 96px;
+
+  /* shape: precise, not round */
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-btn: 4px;
+  --r: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+  --r-pill: 999px;
+
+  /* depth: almost none — hairlines first */
+  --lift-1: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --lift-2: 0 10px 30px -12px rgba(0, 0, 0, 0.18);
+  --lift-3: 0 24px 60px -20px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --ring: 0 0 0 3px rgba(26, 110, 216, 0.22);
+
+  /* motion */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --t-fast: 140ms;
+  --t: 240ms;
+  --t-slow: 600ms;
+
+  --container: 1320px;
+  --header-h: 68px;
+}

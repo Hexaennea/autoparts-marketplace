@@ -1,0 +1,15 @@
+# runtime data
+var/
+*.db
+*.db-wal
+*.db-shm
+# node
+node_modules/
+frontend/dist/
+# local
+.env
+.DS_Store
+.env.*
+!.env.example
+server/dist/
+server/uploads/
