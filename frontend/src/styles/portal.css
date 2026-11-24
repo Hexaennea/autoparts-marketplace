@@ -3,7 +3,6 @@
 .portal__rail { position: sticky; top: 0; height: 100vh; background: #000; color: var(--navy-ink); display: flex; flex-direction: column; padding: var(--s6) var(--s3) var(--s4); gap: var(--s8); overflow-y: auto; }
 .portal__rail :focus-visible { outline-color: #fff; }
 .portal__brand { display: flex; flex-direction: column; gap: 14px; padding: 0 var(--s3); }
-.portal__brand-user { margin-bottom: -6px; font-size: var(--fs-md); font-weight: 500; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .portal__area { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; font-size: var(--fs-micro); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; color: var(--navy-ink-2); }
 .portal__area::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #6fd39b; }
 .portal__area--dark { color: var(--ink); }

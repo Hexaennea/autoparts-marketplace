@@ -21,7 +21,6 @@ export function PortalLayout({ area, nav, children, banner }: { area: string; na
       <aside className="portal__rail carton" aria-label={`${area} navigation`}>
         <div className="portal__brand">
           <Logo inverse />
-          {user && <div className="portal__brand-user">{user.full_name}</div>}
           <span className="portal__area">{area}</span>
         </div>
         <nav className="portal__nav">

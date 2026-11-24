@@ -10,6 +10,10 @@ import { Badge, Button, Card, Dialog, ErrorState, Field, PageHeader, Skeleton, T
 interface MakeNode { id: number; name: string; slug: string; country: string | null; is_active: boolean; models: { id: number; make_id: number; name: string; body_type: string; is_active: boolean; variants: Variant[] }[] }
 
 const BODY = ["hatchback", "sedan", "suv", "muv", "pickup", "coupe", "van"];
+const COUNTRIES = [
+  "India", "Japan", "South Korea", "China", "Germany", "France", "Italy", "United Kingdom",
+  "United States", "Sweden", "Czech Republic", "Spain", "Vietnam",
+];
 const FUEL = ["petrol", "diesel", "cng", "electric", "hybrid"];
 const TRANS = ["manual", "automatic", "amt", "cvt", "dct"];
 
@@ -105,7 +109,7 @@ function Vehicles() {
         {edit && (
           <div className="form-grid">
             <Field label="Name" error={errors.name}>{(p) => <input className="input" {...p} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />}</Field>
-            {edit.kind === "make" && <Field label="Country" optional error={errors.country}>{(p) => <input className="input" {...p} value={edit.country} onChange={(e) => setEdit({ ...edit, country: e.target.value })} />}</Field>}
+            {edit.kind === "make" && <Field label="Country" optional error={errors.country}>{(p) => <select className="select" {...p} value={edit.country} onChange={(e) => setEdit({ ...edit, country: e.target.value })}><option value="">Not set</option>{(edit.country && !COUNTRIES.includes(edit.country) ? [edit.country, ...COUNTRIES] : COUNTRIES).map((c) => <option key={c}>{c}</option>)}</select>}</Field>}
             {edit.kind === "model" && <Field label="Body type" error={errors.body_type}>{(p) => <select className="select" {...p} value={edit.body_type} onChange={(e) => setEdit({ ...edit, body_type: e.target.value })}>{BODY.map((b) => <option key={b}>{b}</option>)}</select>}</Field>}
             {edit.kind === "variant" && (
               <>

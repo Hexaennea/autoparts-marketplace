@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+var/
+e2e/
+.env
+.env.*
+server/.env*
+!server/.env.example

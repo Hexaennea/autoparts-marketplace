@@ -17,6 +17,7 @@ export interface Settings {
   env: "development" | "test" | "production";
   secretKey: string;
   databaseUrl: string;
+  dbPoolMax: number;
   uploadDir: string;
   frontendDist: string;
   publicBaseUrl: string;
@@ -71,6 +72,7 @@ export function loadSettings(overrides: Partial<Settings> = {}): Settings {
     env,
     secretKey: secret ?? randomBytes(48).toString("base64url"),
     databaseUrl: process.env.DATABASE_URL ?? "postgres://partpilot:partpilot@localhost:5432/partpilot",
+    dbPoolMax: int(process.env.PARTPILOT_DB_POOL_MAX, 20),
     uploadDir: process.env.PARTPILOT_UPLOAD_DIR ?? path.join(REPO_ROOT, "var", "uploads"),
     frontendDist: process.env.PARTPILOT_FRONTEND_DIST ?? path.join(REPO_ROOT, "frontend", "dist"),
     publicBaseUrl: process.env.PARTPILOT_PUBLIC_URL ?? "http://localhost:8000",
@@ -88,7 +90,7 @@ export function loadSettings(overrides: Partial<Settings> = {}): Settings {
     trustProxy: bool(process.env.PARTPILOT_TRUST_PROXY, false),
 
     maxJsonBytes: 256 * 1024,
-    maxUploadBytes: 5 * 1024 * 1024,
+    maxUploadBytes: int(process.env.PARTPILOT_MAX_UPLOAD_MB, 5) * 1024 * 1024,
     maxCsvBytes: 1024 * 1024,
 
     defaultCommissionBps: int(process.env.PARTPILOT_COMMISSION_BPS, 800),

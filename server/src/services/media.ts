@@ -2,10 +2,9 @@
 // random name, so no user-supplied bytes, filenames or metadata (EXIF/GPS) are ever served back.
 
 import { randomBytes } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
 import sharp from "sharp";
 import { ApiError } from "../http.js";
+import { saveMedia } from "./storage.js";
 
 export const MAX_IMAGE_PIXELS = 16_000_000; // decompression-bomb guard (~4000 x 4000)
 export const MAX_SIDE = 1600;
@@ -101,15 +100,14 @@ async function store(data: Buffer, uploadDir: string, folder: string): Promise<S
   }
   const raw = { raw: { width: info.width, height: info.height, channels: info.channels } };
 
-  const target = path.join(uploadDir, folder);
-  await fs.mkdir(target, { recursive: true });
   const name = randomBytes(16).toString("hex");
   const fullRel = `${folder}/${name}.webp`;
   const thumbRel = `${folder}/${name}_t.webp`;
-  await sharp(pixels, raw).webp({ quality: 86, effort: 4 }).toFile(path.join(uploadDir, fullRel));
-  await sharp(pixels, raw)
+  const full = await sharp(pixels, raw).webp({ quality: 86, effort: 4 }).toBuffer();
+  const thumb = await sharp(pixels, raw)
     .resize({ width: THUMB_SIDE, height: THUMB_SIDE, fit: "inside", withoutEnlargement: true, kernel: "lanczos3" })
     .webp({ quality: 82, effort: 4 })
-    .toFile(path.join(uploadDir, thumbRel));
+    .toBuffer();
+  await Promise.all([saveMedia(uploadDir, fullRel, full), saveMedia(uploadDir, thumbRel, thumb)]);
   return { path: fullRel, thumbPath: thumbRel, width: info.width, height: info.height };
 }

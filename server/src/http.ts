@@ -293,6 +293,11 @@ export class Api {
         const user = await loadSession(db, sessionToken, settings.sessionIdleHours);
         if (!SAFE_METHODS.has(method)) checkCsrf(user, csrfHeader, csrfCookie);
         authorize(user, route.auth);
+        // Read by the stamp_audit trigger to fill created_by / updated_by (0002_audit_columns.sql).
+        // Transaction-local, so it never leaks to the next request on this pooled connection.
+        if (user && !SAFE_METHODS.has(method)) {
+          await db.query("SELECT set_config('app.user_id', ?, true)", [String(user.id)]);
+        }
         const { body, query } = validate();
         const ctx = new Ctx(req, db, state, user, req.params as Record<string, string>, ip, body, query, upload, route.status);
         ctxRef = ctx;

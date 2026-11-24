@@ -22,6 +22,7 @@ import {
 import { TRANSMISSION_LABEL, reindexProduct } from "./services/catalog.js";
 import { type Address, createPaymentIntent, placeOrder, settlePayment } from "./services/commerce.js";
 import { type ListingData, saveListing, setStatus } from "./services/listings.js";
+import { saveMedia } from "./services/storage.js";
 import { roundHalfEven, slugify } from "./util.js";
 
 export { createPaymentIntent };
@@ -189,7 +190,6 @@ async function variantIds(db: Db, fit: readonly FitSpec[]): Promise<number[]> {
 }
 
 async function attachArt(db: Db, settings: Settings, sellerId: number, art: string, productId: number): Promise<number> {
-  fs.mkdirSync(path.join(settings.uploadDir, "products"), { recursive: true });
   const full = `products/demo-${productId}-${art}.webp`;
   const thumb = `products/demo-${productId}-${art}_t.webp`;
   const src = path.join(ART_DIR, `${art}.webp`);
@@ -197,8 +197,8 @@ async function attachArt(db: Db, settings: Settings, sellerId: number, art: stri
   let width = 800;
   let height = 800;
   if (fs.existsSync(src)) {
-    fs.copyFileSync(src, path.join(settings.uploadDir, full));
-    fs.copyFileSync(fs.existsSync(srcT) ? srcT : src, path.join(settings.uploadDir, thumb));
+    await saveMedia(settings.uploadDir, full, fs.readFileSync(src));
+    await saveMedia(settings.uploadDir, thumb, fs.readFileSync(fs.existsSync(srcT) ? srcT : src));
     const meta = await sharp(src).metadata();
     width = meta.width ?? width;
     height = meta.height ?? height;

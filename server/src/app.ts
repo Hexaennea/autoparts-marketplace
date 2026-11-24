@@ -8,6 +8,7 @@ import { Database } from "./db.js";
 import { type AppState, api, errorBody } from "./http.js";
 import { cookies, requestContext, securityHeaders } from "./security/middleware.js";
 import { RateLimiter } from "./security/ratelimit.js";
+import { sweep } from "./jobs.js";
 import "./api/index.js"; // registers every route on `api`
 
 export interface App {
@@ -16,7 +17,7 @@ export interface App {
 }
 
 export async function createApp(settings: Settings = loadSettings(), database?: Database): Promise<App> {
-  const db = database ?? new Database(settings.databaseUrl);
+  const db = database ?? new Database(settings.databaseUrl, settings.dbPoolMax);
   await db.migrate();
   fs.mkdirSync(settings.uploadDir, { recursive: true });
   const state: AppState = { settings, database: db, limiter: new RateLimiter(settings.rateLimitEnabled) };
@@ -41,6 +42,19 @@ export async function createApp(settings: Settings = loadSettings(), database?: 
         payments_test_mode: settings.paymentsTestMode,
       },
     });
+  });
+
+  // A scheduler (e.g. Google Cloud Scheduler) can call this with "Authorization: Bearer $CRON_SECRET"
+  // when instances may scale to zero and the in-process janitor timer cannot be relied on.
+  // Disabled when the secret is unset.
+  app.get("/api/cron/janitor", async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret || req.headers.authorization !== `Bearer ${secret}`) {
+      res.status(404).json(errorBody("not_found", "This API endpoint doesn't exist."));
+      return;
+    }
+    await sweep(db);
+    res.json({ status: "ok" });
   });
 
   const router = express.Router({ caseSensitive: true, strict: true });

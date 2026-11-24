@@ -165,8 +165,11 @@ export function placeholders(values: readonly unknown[]): string {
 export class Database {
   readonly pool: pg.Pool;
 
-  constructor(readonly url: string) {
-    this.pool = new pg.Pool({ connectionString: url, max: 20, idleTimeoutMillis: 30_000 });
+  constructor(
+    readonly url: string,
+    poolMax = 20,
+  ) {
+    this.pool = new pg.Pool({ connectionString: url, max: poolMax, idleTimeoutMillis: 30_000 });
     this.pool.on("error", (err) => console.error("postgres pool error", err));
   }
 

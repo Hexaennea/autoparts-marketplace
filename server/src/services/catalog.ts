@@ -1,6 +1,7 @@
 // Read models for vehicles, categories, brands and product listings.
 
 import { type Db, type Row, placeholders } from "../db.js";
+import { mediaBase } from "./storage.js";
 
 export const FUEL_LABEL: Record<string, string> = {
   petrol: "Petrol",
@@ -121,7 +122,7 @@ export const PRODUCT_CARD_SELECT = `
 `;
 
 export function mediaUrl(path: string | null | undefined): string | null {
-  return path ? `/media/${path}` : null;
+  return path ? `${mediaBase()}/${path}` : null;
 }
 
 export function cardOut(row: Row, fits: boolean | null = null) {

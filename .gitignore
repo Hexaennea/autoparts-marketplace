@@ -13,3 +13,5 @@ frontend/dist/
 !.env.example
 server/dist/
 server/uploads/
+
+.env*

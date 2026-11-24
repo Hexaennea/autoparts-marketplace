@@ -353,3 +353,31 @@ test("image bomb rejected", () =>
     const res = await upload(seller, bilevelPng(12000, 12000));
     assert.equal(res.status, 415);
   }));
+
+test("audit columns stamped on every table", () =>
+  withEnv(async (env) => {
+    const missing = await env.db.all(
+      `SELECT t.tablename, c.column_name
+       FROM pg_tables t
+       CROSS JOIN unnest(ARRAY['created_at', 'created_by', 'updated_at', 'updated_by']) AS c(column_name)
+       WHERE t.schemaname = current_schema() AND t.tablename <> 'schema_migrations'
+         AND NOT EXISTS (SELECT 1 FROM information_schema.columns i
+                         WHERE i.table_schema = t.schemaname AND i.table_name = t.tablename
+                           AND i.column_name = c.column_name)`,
+    );
+    assert.deepEqual(missing, []);
+
+    const admin = await env.client(ADMIN);
+    const adminId = Number(await env.db.scalar("SELECT id FROM users WHERE email = ?", [ADMIN[0]]));
+    const makeId = (await admin.post("/api/admin/makes", { name: "Skoda", country: "Czech Republic" })).body.data.id;
+    let row = await env.db.one("SELECT created_by, updated_by, created_at, updated_at FROM makes WHERE id = ?", [makeId]);
+    assert.equal(Number(row?.created_by), adminId);
+    assert.equal(Number(row?.updated_by), adminId);
+
+    // The actor is transaction-local: a later system write on the pool is anonymous.
+    await env.db.execute("UPDATE makes SET country = 'India' WHERE id = ?", [makeId]);
+    row = await env.db.one("SELECT created_by, updated_by, created_at, updated_at FROM makes WHERE id = ?", [makeId]);
+    assert.equal(Number(row?.created_by), adminId);
+    assert.equal(row?.updated_by, null);
+    assert.ok(new Date(row?.updated_at as string) >= new Date(row?.created_at as string));
+  }));
