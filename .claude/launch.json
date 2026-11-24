@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "partpilot",
+      "runtimeExecutable": "npm.cmd",
+      "runtimeArgs": ["--prefix", "server", "run", "dev"],
+      "port": 8000
+    }
+  ]
+}

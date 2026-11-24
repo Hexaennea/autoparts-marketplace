@@ -30,6 +30,12 @@ A multi-seller marketplace built only for **car spare parts**. Buyers pick their
 1. Create a database and a login role for the app (once), e.g. role `partpilot` owning databases `partpilot` and `partpilot_test`. Give the role `CREATEDB` if you want to run the tests (they copy a template database per test).
 2. Copy `server/.env.example` to `server/.env` and set `DATABASE_URL` / `TEST_DATABASE_URL`.
 
+### Using Supabase instead of local PostgreSQL
+
+Copy `server/supabase.env.example` to `server/.env` and fill in `DATABASE_URL` (Supabase → Connect → **Session pooler** URI) and `PARTPILOT_SECRET_KEY`. TLS turns on automatically for Supabase hosts. Migration `0003_supabase_lockdown.sql` removes the Data API roles' (`anon`, `authenticated`) access to every table; you can also switch the Data API off in Supabase (Project Settings → Data API). The database needs only the connection string. Tests still run on local PostgreSQL.
+
+**Product photos in Supabase Storage (optional):** create a public bucket `media`, then set `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (secret / service_role key, server only) in `server/.env`. New uploads go to the bucket and image URLs point at it; run `npm run push-media` (in `server/`) once to copy photos already on disk. Leave both empty to keep photos on local disk.
+
 ### Windows (one command)
 
 Double-click **`start-windows.cmd`** in the project folder, or run `.\start-windows.ps1` in PowerShell.

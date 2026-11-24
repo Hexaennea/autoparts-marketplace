@@ -2,8 +2,8 @@
 -- Conventions: identity primary keys, money in paise (BIGINT), timestamps TIMESTAMPTZ (UTC),
 -- enums enforced with CHECK constraints, every foreign key indexed.
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 
 -- unaccent() is not IMMUTABLE, so wrap it for use in generated columns and indexes.
 CREATE OR REPLACE FUNCTION pp_unaccent(text) RETURNS text

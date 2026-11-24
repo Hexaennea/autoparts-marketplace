@@ -26,6 +26,10 @@ export const BUYER_2: [string, string] = ["arjun@partpilot.test", PASSWORD];
 
 const BASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL ?? "";
 if (!BASE_URL) throw new Error("Set TEST_DATABASE_URL (see server/.env)");
+// Tests create and drop whole databases: only ever point them at a local server.
+if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(new URL(BASE_URL).hostname)) {
+  throw new Error("Tests must run on local PostgreSQL. Set TEST_DATABASE_URL to a localhost database in server/.env.");
+}
 const TEMPLATE = "partpilot_template";
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "pp-tests-"));
 const TEMPLATE_UPLOADS = path.join(ROOT, "template-uploads");
@@ -64,6 +68,7 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
     publicBaseUrl: "http://testserver",
     rateLimitEnabled: false,
     frontendDist: path.join(ROOT, "dist"),
+    media: { kind: "local" }, // never upload to a real bucket from tests, even if server/.env has one
     ...overrides,
   });
 }

@@ -31,13 +31,21 @@ Write-Host ("   using: node " + (& node --version))
 
 # ---- 2. PostgreSQL + settings ------------------------------------------------------------
 Step "Checking PostgreSQL"
-$pg = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $pg) { Fail "PostgreSQL was not found. Install it with:  winget install -e --id PostgreSQL.PostgreSQL.17" }
-if ($pg.Status -ne "Running") { Fail "The PostgreSQL service ($($pg.Name)) is not running. Start it from Services." }
-if (-not (Test-Path (Join-Path $Server ".env"))) {
-    Fail "server\.env is missing. Copy server\.env.example to server\.env and set DATABASE_URL."
+$EnvFile = Join-Path $Server ".env"
+if (-not (Test-Path $EnvFile)) {
+    Fail "server\.env is missing. Copy server\.env.example (local) or server\supabase.env.example (Supabase) to server\.env."
 }
-Write-Host "   using: $($pg.Name)"
+# A DATABASE_URL pointing at another machine (e.g. Supabase) needs no local PostgreSQL service.
+$dbLine = Select-String -Path $EnvFile -Pattern '^\s*DATABASE_URL\s*=' | Select-Object -First 1
+$isLocalDb = (-not $dbLine) -or ($dbLine.Line -match '@(localhost|127\.0\.0\.1|\[::1\])[:/]')
+if ($isLocalDb) {
+    $pg = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $pg) { Fail "PostgreSQL was not found. Install it with:  winget install -e --id PostgreSQL.PostgreSQL.17" }
+    if ($pg.Status -ne "Running") { Fail "The PostgreSQL service ($($pg.Name)) is not running. Start it from Services." }
+    Write-Host "   using: $($pg.Name)"
+} else {
+    Write-Host "   using: remote database from server\.env"
+}
 
 # ---- 3. Packages -------------------------------------------------------------------------
 foreach ($dir in @($Server, $Frontend)) {

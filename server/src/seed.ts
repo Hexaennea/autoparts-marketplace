@@ -197,8 +197,8 @@ async function attachArt(db: Db, settings: Settings, sellerId: number, art: stri
   let width = 800;
   let height = 800;
   if (fs.existsSync(src)) {
-    await saveMedia(settings.uploadDir, full, fs.readFileSync(src));
-    await saveMedia(settings.uploadDir, thumb, fs.readFileSync(fs.existsSync(srcT) ? srcT : src));
+    await saveMedia(settings, full, fs.readFileSync(src));
+    await saveMedia(settings, thumb, fs.readFileSync(fs.existsSync(srcT) ? srcT : src));
     const meta = await sharp(src).metadata();
     width = meta.width ?? width;
     height = meta.height ?? height;
@@ -525,10 +525,27 @@ export async function runSeed(
 ): Promise<Record<string, number>> {
   if (isProduction(settings)) throw new Error("Refusing to load demo data in production.");
   if (reset) {
-    // Drop every table, sequence and extension, then rebuild from the migrations
-    // (0001_initial.sql recreates the pg_trgm and unaccent extensions).
+    // Drop every table (with its sequences and triggers) and every app function in `public`,
+    // then rebuild from the migrations. Extensions and the schema itself are kept, so this is
+    // also safe on Supabase, where `public` carries grants the dashboard relies on.
     await database.withClient(async (db) => {
-      await db.conn.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;");
+      await db.conn.query(`
+        DO $$
+        DECLARE r record;
+        BEGIN
+          FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+            EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE', r.tablename);
+          END LOOP;
+          FOR r IN
+            SELECT p.oid::regprocedure AS sig
+              FROM pg_proc p
+              JOIN pg_namespace n ON n.oid = p.pronamespace
+             WHERE n.nspname = 'public'
+               AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
+          LOOP
+            EXECUTE format('DROP FUNCTION IF EXISTS %s CASCADE', r.sig);
+          END LOOP;
+        END $$;`);
     });
     // Only the products folder is ever written by the app (services/media.ts), same as the Python reset.
     fs.rmSync(path.join(settings.uploadDir, "products"), { recursive: true, force: true });

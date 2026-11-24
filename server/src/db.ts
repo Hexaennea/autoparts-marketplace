@@ -162,14 +162,51 @@ export function placeholders(values: readonly unknown[]): string {
   return values.map(() => "?").join(",");
 }
 
+/**
+ * TLS to the database server.
+ * - off:     plain connection (local PostgreSQL)
+ * - require: encrypted, certificate not checked (quick start with Supabase)
+ * - verify:  encrypted and the server certificate is checked against `caFile`
+ *            (Supabase: Project Settings -> Database -> SSL certificate)
+ */
+export interface DbSsl {
+  mode: "off" | "require" | "verify";
+  caFile?: string;
+}
+
+/** Build the pool's connection settings. With TLS on, `sslmode` etc. are removed from the URL
+ *  because node-postgres lets URL parameters override the `ssl` object. */
+export function connectionConfig(url: string, ssl: DbSsl): pg.PoolConfig {
+  if (ssl.mode === "off") return { connectionString: url };
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    // Never echo the URL: it contains the database password.
+    throw new Error(
+      "DATABASE_URL is not a valid address. If the password has special characters (@ : / # ? % + $), " +
+        "reset it in Supabase to letters and numbers only.",
+    );
+  }
+  for (const key of ["sslmode", "ssl", "sslrootcert", "sslcert", "sslkey", "uselibpqcompat"]) {
+    u.searchParams.delete(key);
+  }
+  if (ssl.mode === "verify") {
+    if (!ssl.caFile) throw new Error("PARTPILOT_DB_SSL=verify needs PARTPILOT_DB_SSL_CA (path to the CA certificate)");
+    return { connectionString: u.toString(), ssl: { rejectUnauthorized: true, ca: fs.readFileSync(ssl.caFile, "utf8") } };
+  }
+  return { connectionString: u.toString(), ssl: { rejectUnauthorized: false } };
+}
+
 export class Database {
   readonly pool: pg.Pool;
 
   constructor(
     readonly url: string,
     poolMax = 20,
+    ssl: DbSsl = { mode: "off" },
   ) {
-    this.pool = new pg.Pool({ connectionString: url, max: poolMax, idleTimeoutMillis: 30_000 });
+    this.pool = new pg.Pool({ ...connectionConfig(url, ssl), max: poolMax, idleTimeoutMillis: 30_000 });
     this.pool.on("error", (err) => console.error("postgres pool error", err));
   }
 

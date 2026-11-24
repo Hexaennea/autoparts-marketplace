@@ -9,6 +9,7 @@ import { type AppState, api, errorBody } from "./http.js";
 import { cookies, requestContext, securityHeaders } from "./security/middleware.js";
 import { RateLimiter } from "./security/ratelimit.js";
 import { sweep } from "./jobs.js";
+import { configureStorage, mediaOrigin } from "./services/storage.js";
 import "./api/index.js"; // registers every route on `api`
 
 export interface App {
@@ -17,8 +18,9 @@ export interface App {
 }
 
 export async function createApp(settings: Settings = loadSettings(), database?: Database): Promise<App> {
-  const db = database ?? new Database(settings.databaseUrl, settings.dbPoolMax);
+  const db = database ?? new Database(settings.databaseUrl, settings.dbPoolMax, settings.dbSsl);
   await db.migrate();
+  configureStorage(settings);
   fs.mkdirSync(settings.uploadDir, { recursive: true });
   const state: AppState = { settings, database: db, limiter: new RateLimiter(settings.rateLimitEnabled) };
 
@@ -27,7 +29,7 @@ export async function createApp(settings: Settings = loadSettings(), database?: 
   app.set("etag", false);
   if (settings.trustProxy) app.set("trust proxy", true);
   app.use(requestContext(settings.env !== "test"));
-  app.use(securityHeaders(isProduction(settings)));
+  app.use(securityHeaders(isProduction(settings), mediaOrigin(settings)));
   app.use(cookies());
 
   app.get("/api/health", async (_req, res) => {

@@ -1,0 +1,19 @@
+# Keep keys, local data and build output out of the Docker image.
+.git
+.claude
+**/.env
+**/.env.*
+**/*.crt
+**/*.pem
+**/*.key
+**/node_modules
+frontend/dist
+server/dist
+server/uploads
+var
+e2e
+docs
+backend
+*.db
+*.db-wal
+*.db-shm

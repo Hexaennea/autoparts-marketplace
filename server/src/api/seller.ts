@@ -459,7 +459,7 @@ api.route("POST", "/api/seller/media", { auth: "seller", upload: "image", rate: 
   if (unattached >= 100) {
     throw new ApiError(429, "too_many_uploads", "Attach or remove your recent uploads before adding more.");
   }
-  const stored = await storeImage(ctx.upload.data, ctx.settings.uploadDir);
+  const stored = await storeImage(ctx.upload.data, ctx.settings);
   const mediaId = await ctx.db.insert(
     "INSERT INTO media (seller_id, path, thumb_path, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     [sellerId, stored.path, stored.thumbPath, stored.width, stored.height, utcnow()],

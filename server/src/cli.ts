@@ -4,10 +4,14 @@
 //   tsx src/cli.ts create-admin EMAIL    prompts for a password
 //   tsx src/cli.ts purge-sessions
 //   tsx src/cli.ts expire-unpaid
+//   npm run push-media                   copy local product images to the Supabase bucket
 
+import fs from "node:fs";
+import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { isProduction, loadSettings } from "./config.js";
 import { Database, utcnow } from "./db.js";
+import { configureStorage, saveMedia } from "./services/storage.js";
 import { hashPassword, passwordProblems } from "./security/passwords.js";
 import { purgeExpired } from "./security/sessions.js";
 import { expireUnpaidOrders } from "./services/commerce.js";
@@ -15,9 +19,26 @@ import { expireUnpaidOrders } from "./services/commerce.js";
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   const settings = loadSettings();
-  const database = new Database(settings.databaseUrl);
+  configureStorage(settings);
+  const database = new Database(settings.databaseUrl, 2, settings.dbSsl);
   try {
     switch (command) {
+      case "push-media": {
+        // Copy every image already on local disk (uploadDir/products) to the Supabase bucket.
+        if (settings.media.kind !== "supabase") {
+          console.error("Set SUPABASE_URL and SUPABASE_SECRET_KEY in server/.env first.");
+          return 1;
+        }
+        const dir = path.join(settings.uploadDir, "products");
+        const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".webp")) : [];
+        let done = 0;
+        for (const file of files) {
+          await saveMedia(settings, `products/${file}`, fs.readFileSync(path.join(dir, file)));
+          if (++done % 20 === 0) console.log(`  ${done}/${files.length}`);
+        }
+        console.log(`Uploaded ${done} images to bucket "${settings.media.bucket}".`);
+        return 0;
+      }
       case "migrate": {
         const applied = await database.migrate();
         console.log(`Applied: ${applied.join(", ") || "nothing new"}`);
@@ -84,7 +105,7 @@ async function main(argv: string[]): Promise<number> {
         console.log(`Removed ${await purgeExpired(database.reader())} expired sessions.`);
         return 0;
       default:
-        console.error("Commands: migrate | seed [--reset] | create-admin EMAIL | purge-sessions | expire-unpaid");
+        console.error("Commands: migrate | seed [--reset] | push-media | create-admin EMAIL | purge-sessions | expire-unpaid");
         return 1;
     }
   } finally {

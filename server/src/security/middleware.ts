@@ -4,21 +4,25 @@ import { randomBytes } from "node:crypto";
 import { parse as parseCookie } from "cookie";
 import type { NextFunction, Request, Response } from "express";
 
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self' data: blob:",
-  "font-src 'self'",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
-].join("; ");
+function contentSecurityPolicy(imageOrigin: string | null): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self'",
+    `img-src 'self' data: blob:${imageOrigin ? ` ${imageOrigin}` : ""}`,
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+}
 
-export function securityHeaders(hsts: boolean) {
+/** `imageOrigin`: where product photos are served from when it isn't this app (e.g. Supabase Storage). */
+export function securityHeaders(hsts: boolean, imageOrigin: string | null = null) {
+  const CSP = contentSecurityPolicy(imageOrigin);
   return (req: Request, res: Response, next: NextFunction) => {
     res.setHeader("x-content-type-options", "nosniff");
     res.setHeader("x-frame-options", "DENY");

@@ -4,7 +4,7 @@
 import { randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { ApiError } from "../http.js";
-import { saveMedia } from "./storage.js";
+import { type StorageSettings, saveMedia } from "./storage.js";
 
 export const MAX_IMAGE_PIXELS = 16_000_000; // decompression-bomb guard (~4000 x 4000)
 export const MAX_SIDE = 1600;
@@ -49,12 +49,12 @@ function release(): void {
   if (next) next();
 }
 
-export async function storeImage(data: Buffer, uploadDir: string, folder = "products"): Promise<StoredImage> {
+export async function storeImage(data: Buffer, storage: StorageSettings, folder = "products"): Promise<StoredImage> {
   if (!(await acquire(10_000))) {
     throw new ApiError(503, "busy", "We're processing other photos. Try again in a moment.");
   }
   try {
-    return await store(data, uploadDir, folder);
+    return await store(data, storage, folder);
   } finally {
     release();
   }
@@ -62,7 +62,7 @@ export async function storeImage(data: Buffer, uploadDir: string, folder = "prod
 
 const unreadable = () => new ApiError(415, "unsupported_type", "That file isn't a readable photo.");
 
-async function store(data: Buffer, uploadDir: string, folder: string): Promise<StoredImage> {
+async function store(data: Buffer, storage: StorageSettings, folder: string): Promise<StoredImage> {
   // Probe the header only (no pixel decode yet).
   let meta: sharp.Metadata;
   try {
@@ -108,6 +108,6 @@ async function store(data: Buffer, uploadDir: string, folder: string): Promise<S
     .resize({ width: THUMB_SIDE, height: THUMB_SIDE, fit: "inside", withoutEnlargement: true, kernel: "lanczos3" })
     .webp({ quality: 82, effort: 4 })
     .toBuffer();
-  await Promise.all([saveMedia(uploadDir, fullRel, full), saveMedia(uploadDir, thumbRel, thumb)]);
+  await Promise.all([saveMedia(storage, fullRel, full), saveMedia(storage, thumbRel, thumb)]);
   return { path: fullRel, thumbPath: thumbRel, width: info.width, height: info.height };
 }
