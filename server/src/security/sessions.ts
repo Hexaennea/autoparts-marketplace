@@ -24,6 +24,8 @@ export interface SessionUser {
   status: string;
   sellerId: number | null;
   sellerStatus: string | null;
+  isSuperAdmin: boolean;
+  mustChangePassword: boolean;
 }
 
 export async function createSession(
@@ -46,7 +48,7 @@ export async function loadSession(db: Db, token: string | undefined, idleHours: 
   if (!token || token.length > 200) return null;
   const row = await db.one(
     `SELECT s.id AS session_id, s.csrf_token, s.expires_at, s.last_seen_at,
-            u.id, u.email, u.full_name, u.role, u.status,
+            u.id, u.email, u.full_name, u.role, u.status, u.is_super_admin, u.must_change_password,
             se.id AS seller_id, se.kyc_status AS seller_status
      FROM sessions s
      JOIN users u ON u.id = s.user_id
@@ -77,6 +79,8 @@ export async function loadSession(db: Db, token: string | undefined, idleHours: 
     status: row.status,
     sellerId: row.seller_id,
     sellerStatus: row.seller_status,
+    isSuperAdmin: Boolean(row.is_super_admin),
+    mustChangePassword: Boolean(row.must_change_password),
   };
 }
 

@@ -27,6 +27,8 @@ export interface QueryState<T> {
   error: ApiError | null;
   loading: boolean;
   reload: () => void;
+  /** Fetch fresh data while still showing the current data (no loading flash). Rejects on error. */
+  refresh: () => Promise<void>;
   mutate: (next: T | ((prev: T | undefined) => T)) => void;
 }
 
@@ -76,6 +78,14 @@ export function useQuery<T>(path: string | null, params?: Params): QueryState<T>
     setTick((n) => n + 1);
   }, [key]);
 
+  const refresh = useCallback(async () => {
+    if (!path) return;
+    const result = await api.get<T>(path, paramsRef.current);
+    cache.set(key, result);
+    setData(result);
+    setError(null);
+  }, [key, path]);
+
   const mutate = useCallback(
     (next: T | ((prev: T | undefined) => T)) => {
       setData((prev) => {
@@ -87,7 +97,7 @@ export function useQuery<T>(path: string | null, params?: Params): QueryState<T>
     [key],
   );
 
-  return { data, error, loading, reload, mutate };
+  return { data, error, loading, reload, refresh, mutate };
 }
 
 /** Debounce a fast-changing value (search-as-you-type). */

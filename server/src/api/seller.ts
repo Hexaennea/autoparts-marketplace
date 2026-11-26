@@ -10,7 +10,7 @@ import { type ListingData, listingEditable, saveListing, setStatus } from "../se
 import { storeImage } from "../services/media.js";
 import { GSTIN, IFSC, Int, LongText, PAN, Phone, Pincode, QueryBool, State, Text, optional } from "../util.js";
 import { userPayload } from "./auth.js";
-import { fulfilmentOut } from "./orders.js";
+import { fulfilmentOut, invoiceResponse } from "./orders.js";
 
 const pattern = (re: RegExp, source: string) => z.string().regex(re, `String should match pattern '${source}'`);
 
@@ -557,7 +557,7 @@ api.route(
 // ---- fulfilment ---------------------------------------------------------------------------------------
 
 const SellerOrdersQuery = z.object({
-  status: blankEnum(["to_ship", "placed", "packed", "shipped", "delivered", "cancelled", "return_requested", "returned"]),
+  status: blankEnum(["to_ship", "placed", "packed", "shipped", "delivered", "cancelled", "returns", "return_requested", "returned"]),
   q: z.string().max(40).default(""),
   page: Int.pipe(z.number().gte(1).lte(1000)).default(1),
   per_page: Int.pipe(z.number().gte(1).lte(100)).default(20),
@@ -570,6 +570,8 @@ api.route("GET", "/api/seller/orders", { auth: "seller", query: SellerOrdersQuer
   const params: unknown[] = [sellerId];
   if (q.status === "to_ship") {
     where.push("f.status IN ('placed','packed')");
+  } else if (q.status === "returns") {
+    where.push("f.status IN ('return_requested','returned')");
   } else if (q.status) {
     where[1] = "f.status = ?";
     params.push(q.status);
@@ -598,7 +600,12 @@ api.route("GET", "/api/seller/orders", { auth: "seller", query: SellerOrdersQuer
   ])) {
     counts[r.status] = r.n;
   }
+  // Tabs: To ship + Shipped + Delivered + Returns + Cancelled = All (unpaid online orders are never shown).
   counts.to_ship = (counts.placed ?? 0) + (counts.packed ?? 0);
+  counts.returns = (counts.return_requested ?? 0) + (counts.returned ?? 0);
+  counts.all = Object.entries(counts)
+    .filter(([s]) => ["placed", "packed", "shipped", "delivered", "cancelled", "return_requested", "returned"].includes(s))
+    .reduce((sum, [, n]) => sum + Number(n), 0);
   return {
     items: rows.map((r) => ({ ...r, status_label: STATUS_LABEL[r.status] })),
     counts,
@@ -669,6 +676,10 @@ export async function sellerFulfilmentDetail(ctx: Ctx, f: Row) {
 
 api.route("GET", "/api/seller/orders/{fulfilment_id:int}", { auth: "seller" }, async (ctx) => {
   return sellerFulfilmentDetail(ctx, await ownFulfilment(ctx, ctx.sellerId()));
+});
+
+api.route("GET", "/api/seller/orders/{fulfilment_id:int}/invoice.pdf", { auth: "seller" }, async (ctx) => {
+  return invoiceResponse(ctx, await ownFulfilment(ctx, ctx.sellerId()));
 });
 
 export const FulfilmentActionIn = z.object({

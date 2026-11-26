@@ -15,8 +15,9 @@ import { utcnow } from "./db.js";
 import type { Settings } from "./config.js";
 import type { RateLimiter } from "./security/ratelimit.js";
 import { type SessionUser, loadSession } from "./security/sessions.js";
+import { kickOutboxIfDirty } from "./services/notify.js";
 
-export type Auth = "public" | "user" | "buyer" | "seller" | "admin";
+export type Auth = "public" | "user" | "buyer" | "seller" | "admin" | "super_admin";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export class ApiError extends Error {
@@ -321,6 +322,7 @@ export class Api {
             throw err;
           }
         });
+        kickOutboxIfDirty(); // committed: queued pushes can go out now
         if (deferred) throw deferred;
       }
 
@@ -460,7 +462,15 @@ export function authorize(user: SessionUser | null, auth: Auth): void {
     throw forbidden("This action is for shopper accounts.");
   }
   if (auth === "seller" && user.role !== "seller") throw forbidden("This area is for sellers.");
-  if (auth === "admin" && user.role !== "admin") throw forbidden("This area is for administrators.");
+  if ((auth === "admin" || auth === "super_admin") && user.role !== "admin") throw forbidden("This area is for administrators.");
+  if (auth === "admin" || auth === "super_admin") {
+    // Someone else chose this password (new admin, or a reset): the admin area stays shut until the
+    // admin sets their own with POST /api/auth/password.
+    if (user.mustChangePassword) {
+      throw new ApiError(403, "password_change_required", "Set a new password before using the admin area.");
+    }
+    if (auth === "super_admin" && !user.isSuperAdmin) throw forbidden("Only a super admin can manage admin accounts.");
+  }
 }
 
 // ---- helpers shared by handlers -------------------------------------------------------------

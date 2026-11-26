@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-for (const dir of ["migrations", "seed_assets"]) {
+for (const dir of ["migrations", "seed_assets", "fonts"]) {
   const from = path.join(root, "src", dir);
   if (fs.existsSync(from)) fs.cpSync(from, path.join(root, "dist", dir), { recursive: true });
 }

@@ -27,6 +27,7 @@
   ],
   "exclude": [
     "src/types/offline",
-    "src/**/*.test.ts"
+    "src/**/*.test.ts",
+    "src/sw"
   ]
 }

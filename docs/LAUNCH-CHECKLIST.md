@@ -42,10 +42,17 @@ What separates this build from taking real money. Grouped by owner; tick before 
 - [ ] Redis rate limiter before running more than one instance
 - [ ] Scheduled `python -m app.cli purge-sessions`
 
-## Notifications (not built yet)
+## Notifications
 
-- [ ] Order / shipping / return emails and SMS to buyers
-- [ ] New-order alerts to sellers; KYC and listing-review outcomes
+- [x] In-app notifications (bell + list) for order placed / shipped / delivered / cancelled / returns, buyers and sellers (`server/src/services/notify.ts`)
+- [x] Push queue for the mobile apps with retry, multi-instance locking and dead-token cleanup (`server/src/services/push.ts`); apps register at `POST /api/push/devices`
+- [x] Firebase project "PartPilot" (`partpilot-b6b87`), Android app `com.harsivautotech.partpilot` and web app registered; web push (service worker + "Turn on notifications") built
+- [x] Android app project (Capacitor) in `mobile/`, see `docs/MOBILE-APP.md`
+- [ ] Set `FCM_SERVICE_ACCOUNT` (service-account JSON, as a secret). Until then pushes are marked `skipped`
+- [ ] Build and test the Android APK (needs Android Studio and `google-services.json`); point `server.url` at the live domain before Play Store
+- [ ] Google Cloud Scheduler calling `GET /api/cron/janitor` every 1-2 minutes with `CRON_SECRET` (Cloud Run gives idle instances no CPU, so in-process timers stop)
+- [ ] Order / shipping / return emails and SMS to buyers (email needs a domain; SMS needs TRAI DLT registration)
+- [ ] KYC and listing-review outcome notifications to sellers
 - [ ] Password reset by email (current build supports change-while-signed-in only)
 
 ## Assurance

@@ -2,8 +2,9 @@
 
 import { z } from "zod";
 import { type Db, type Row, utcnow } from "../db.js";
-import { ApiError, type Ctx, api, forbidden, notFound, pageMeta, paginate, pathInt } from "../http.js";
+import { ApiError, type Ctx, RawResponse, api, forbidden, notFound, pageMeta, paginate, pathInt } from "../http.js";
 import { mediaUrl } from "../services/catalog.js";
+import { invoiceFileName, invoicePdf, loadInvoice } from "../services/invoice.js";
 import {
   type Address,
   STATUS_LABEL,
@@ -53,10 +54,29 @@ const ReasonIn = z.object({
   reason: LongText(3, 500),
 });
 
+/** Shopper order filters: an order matches a status group when any of its shipments is in it. */
+const ORDER_GROUPS = {
+  active: ["pending_payment", "placed", "packed", "shipped"],
+  delivered: ["delivered"],
+  returns: ["return_requested", "returned"],
+  cancelled: ["cancelled"],
+} as const;
+type OrderGroup = keyof typeof ORDER_GROUPS;
+const ORDER_PERIOD_DAYS = { "30d": 30, "6m": 183, "1y": 365 } as const;
+
+/** "" or a missing value means "no filter". */
+const blankToNull = (v: unknown) => (v === "" || v === undefined ? null : v);
+
 const OrdersQuery = z.object({
+  status: z.preprocess(blankToNull, z.enum(["active", "delivered", "returns", "cancelled"]).nullable()),
+  period: z.preprocess(blankToNull, z.enum(["30d", "6m", "1y"]).nullable()),
+  q: z.string().max(60).default(""),
   page: IntField().pipe(z.number().gte(1).lte(1000)).default(1),
   per_page: IntField().pipe(z.number().gte(1).lte(50)).default(10),
 });
+
+const groupClause = (group: OrderGroup) =>
+  `EXISTS (SELECT 1 FROM fulfilments f WHERE f.order_id = o.id AND f.status IN (${ORDER_GROUPS[group].map((s) => `'${s}'`).join(",")}))`;
 
 export async function fulfilmentOut(
   db: Db,
@@ -88,6 +108,7 @@ export async function fulfilmentOut(
     refund_paise: f.refund_paise,
     shipped_at: f.shipped_at,
     delivered_at: f.delivered_at,
+    invoice_number: f.invoice_number ?? null,
     items: items.map(({ thumb, ...rest }) => ({ ...rest, image: mediaUrl(thumb) })),
     events: events.map((e) => ({ ...e, label: STATUS_LABEL[e.status] ?? e.status })),
   };
@@ -142,6 +163,16 @@ export async function orderOut(db: Db, order: Row, { returnDays }: { returnDays:
   };
 }
 
+/** The shipment's GST invoice as a PDF download; 404 until it has shipped. */
+export async function invoiceResponse(ctx: Ctx, f: Row): Promise<RawResponse> {
+  const invoice = await loadInvoice(ctx.db, f, ctx.settings.appName);
+  if (!invoice) throw notFound("Invoice");
+  return new RawResponse(await invoicePdf(invoice), "application/pdf", {
+    "content-disposition": `attachment; filename="${invoiceFileName(invoice.number)}"`,
+    "cache-control": "private, no-store",
+  });
+}
+
 async function returnDays(ctx: Ctx): Promise<number> {
   return (await getSettings(ctx.db, ctx.settings)).return_window_days;
 }
@@ -187,17 +218,40 @@ api.route("POST", "/api/orders", { auth: "buyer", body: CheckoutIn, rate: "check
 
 api.route("GET", "/api/orders", { auth: "user", query: OrdersQuery }, async (ctx) => {
   const user = ctx.requireUser();
-  const { limit, offset } = paginate(ctx.query.page, ctx.query.per_page);
-  const total = Number(await ctx.db.scalar("SELECT COUNT(*) FROM orders WHERE buyer_id = ?", [user.id]));
-  const rows = await ctx.db.all("SELECT * FROM orders WHERE buyer_id = ? ORDER BY id DESC LIMIT ? OFFSET ?", [
-    user.id,
-    limit,
-    offset,
+  const q = ctx.query;
+  const { limit, offset } = paginate(q.page, q.per_page);
+
+  // Search and period narrow everything, tab counts included; the status tab is applied on top.
+  const base = ["o.buyer_id = ?"];
+  const baseParams: unknown[] = [user.id];
+  if (q.period) {
+    base.push("o.created_at >= ?");
+    baseParams.push(new Date(Date.now() - ORDER_PERIOD_DAYS[q.period] * 86_400_000).toISOString());
+  }
+  const text = q.q.trim();
+  if (text) {
+    // Order number, or the title / brand / part number of anything in the order.
+    const like = `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    base.push(
+      "(o.number ILIKE ? OR EXISTS (SELECT 1 FROM order_items oi JOIN fulfilments f ON f.id = oi.fulfilment_id WHERE f.order_id = o.id" +
+        " AND (oi.title ILIKE ? OR oi.brand ILIKE ? OR oi.part_number ILIKE ?)))",
+    );
+    baseParams.push(like, like, like, like);
+  }
+  const where = q.status ? [...base, groupClause(q.status)] : base;
+  const sqlWhere = ` FROM orders o WHERE ${where.join(" AND ")}`;
+  const countCols = (Object.keys(ORDER_GROUPS) as OrderGroup[]).map((g) => `COUNT(*) FILTER (WHERE ${groupClause(g)}) AS ${g}`);
+
+  const [total, rows, counts, days] = await Promise.all([
+    ctx.db.scalar(`SELECT COUNT(*)${sqlWhere}`, baseParams),
+    ctx.db.all(`SELECT o.*${sqlWhere} ORDER BY o.id DESC LIMIT ? OFFSET ?`, [...baseParams, limit, offset]),
+    ctx.db.one(`SELECT COUNT(*) AS "all", ${countCols.join(", ")} FROM orders o WHERE ${base.join(" AND ")}`, baseParams),
+    returnDays(ctx),
   ]);
-  const days = await returnDays(ctx);
-  const items = [];
-  for (const r of rows) items.push(await orderOut(ctx.db, r, { returnDays: days }));
-  return { items, ...pageMeta(total, ctx.query.page, limit) };
+  const items = await Promise.all(rows.map((r) => orderOut(ctx.db, r, { returnDays: days })));
+  const countsOut: Record<string, number> = {};
+  for (const [k, v] of Object.entries(counts ?? {})) countsOut[k] = Number(v);
+  return { items, counts: countsOut, ...pageMeta(Number(total ?? 0), q.page, limit) };
 });
 
 api.route("GET", "/api/orders/{order_id:int}", { auth: "user" }, async (ctx) => {
@@ -235,6 +289,13 @@ api.route("POST", "/api/orders/{order_id:int}/payment/retry", { auth: "user", ra
   await createPaymentIntent(ctx.db, order.id, order.total_paise);
   await ctx.db.execute("UPDATE orders SET payment_status = 'pending', updated_at = ? WHERE id = ?", [utcnow(), order.id]);
   return orderOut(ctx.db, await freshOrder(ctx, order.id), { returnDays: await returnDays(ctx) });
+});
+
+api.route("GET", "/api/orders/{order_id:int}/fulfilments/{fulfilment_id:int}/invoice.pdf", { auth: "user" }, async (ctx) => {
+  const order = await ownOrder(ctx, pathInt(ctx, "order_id"));
+  const f = await ctx.db.one("SELECT * FROM fulfilments WHERE id = ? AND order_id = ?", [pathInt(ctx, "fulfilment_id"), order.id]);
+  if (!f) throw notFound("Shipment");
+  return invoiceResponse(ctx, f);
 });
 
 async function ownFulfilment(ctx: Ctx): Promise<[Row, Row]> {

@@ -30,7 +30,7 @@ export function SellerDashboard() {
         <div className="kpis" style={{ "--n": 4 }}>
           <div className="kpi"><span className="micro">Sales · 30 days</span><span className="kpi__value">{rupeesShort(d.kpis.sales_30d)}</span><span className="kpi__note">{d.kpis.orders_30d} orders</span></div>
           <Link to="/seller/orders?status=to_ship" className={`kpi ${d.kpis.to_ship ? "kpi--alert" : ""}`}><span className="micro">To pack &amp; ship</span><span className="kpi__value">{d.kpis.to_ship}</span><span className="kpi__note">Ship within 2 days</span></Link>
-          <Link to="/seller/orders?status=return_requested" className={`kpi ${d.kpis.returns_open ? "kpi--alert" : ""}`}><span className="micro">Return requests</span><span className="kpi__value">{d.kpis.returns_open}</span><span className="kpi__note">Respond within 48 h</span></Link>
+          <Link to="/seller/orders?status=returns" className={`kpi ${d.kpis.returns_open ? "kpi--alert" : ""}`}><span className="micro">Return requests</span><span className="kpi__value">{d.kpis.returns_open}</span><span className="kpi__note">Respond within 48 h</span></Link>
           <Link to="/seller/listings" className="kpi"><span className="micro">Live listings</span><span className="kpi__value">{d.kpis.active_listings}</span><span className="kpi__note">{d.kpis.pending_listings} in review · {d.kpis.low_stock} low stock</span></Link>
         </div>
       )}

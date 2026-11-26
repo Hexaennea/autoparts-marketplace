@@ -11,7 +11,8 @@ function contentSecurityPolicy(imageOrigin: string | null): string {
     "style-src 'self'",
     `img-src 'self' data: blob:${imageOrigin ? ` ${imageOrigin}` : ""}`,
     "font-src 'self'",
-    "connect-src 'self'",
+    // Web push: the Firebase SDK registers the browser with these two Google endpoints (lib/push.ts).
+    "connect-src 'self' https://fcmregistrations.googleapis.com https://firebaseinstallations.googleapis.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

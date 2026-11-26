@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { LuCircleAlert, LuCircleCheck, LuInfo, LuX } from "react-icons/lu";
 import { api, errorMessage, onSessionExpired, setCsrf } from "../lib/api";
 import { invalidate } from "../lib/query";
+import { unregisterPush } from "../lib/push";
 import type { AppConfig, Quote, Session, User, Vehicle } from "../lib/types";
 
 /* ---------------- toasts ---------------- */
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setSession]);
 
   const logout = useCallback(async () => {
+    await unregisterPush(); // this device stops getting the leaving account's alerts
     const session = await api.post<Session>("/api/auth/logout");
     invalidate("/api/");
     setSession(session);

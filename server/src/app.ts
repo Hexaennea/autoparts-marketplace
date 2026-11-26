@@ -99,7 +99,8 @@ export async function createApp(settings: Settings = loadSettings(), database?: 
     if (name && !name.includes("/")) {
       const candidate = path.resolve(dist, name);
       if (path.dirname(candidate) === path.resolve(dist) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-        res.setHeader("cache-control", "public, max-age=3600");
+        // A service worker must be re-checked on every visit so push fixes reach browsers promptly.
+        res.setHeader("cache-control", name.endsWith("-sw.js") ? "no-cache" : "public, max-age=3600");
         res.sendFile(candidate);
         return;
       }

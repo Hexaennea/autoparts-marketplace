@@ -44,6 +44,20 @@ const options = {
 rmSync(outdir, { recursive: true, force: true });
 mkdirSync(`${outdir}/assets`, { recursive: true });
 
+// Web push service worker: its own classic script at the site root (a worker's scope is the folder
+// it is served from, so it must be /firebase-messaging-sw.js to receive pushes for every page).
+const swOptions = {
+  entryPoints: ["src/sw/firebase-messaging-sw.ts"],
+  bundle: true,
+  format: "iife",
+  outfile: `${outdir}/firebase-messaging-sw.js`,
+  target: ["es2020", "chrome100", "safari15", "firefox100"],
+  minify: !watch,
+  legalComments: "none",
+  define: options.define,
+  logLevel: "warning",
+};
+
 if (watch) {
   const url = `http://localhost:${process.env.PORT ?? 8000}`;
   const onEnd = (r) => {
@@ -53,8 +67,9 @@ if (watch) {
   };
   const ctx = await esbuild.context({ ...options, plugins: [{ name: "index", setup(b) { b.onEnd(onEnd); } }] });
   await ctx.watch();
+  await (await esbuild.context(swOptions)).watch();
 } else {
-  const result = await esbuild.build(options);
+  const [result] = await Promise.all([esbuild.build(options), esbuild.build(swOptions)]);
   writeIndex(result);
   const sizes = Object.entries(result.metafile.outputs)
     .filter(([f]) => f.endsWith(".js") || f.endsWith(".css"))

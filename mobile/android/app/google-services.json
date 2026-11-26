@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "597855628000",
+    "project_id": "partpilot-b6b87",
+    "storage_bucket": "partpilot-b6b87.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:597855628000:android:82044d7bd7b1a9701c3e85",
+        "android_client_info": {
+          "package_name": "com.harsivautotech.partpilot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrlf_5MuF8L5qMBrlQMuynVda5DeBVqvw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -328,3 +328,38 @@ a.kpi:hover { background: var(--label-sunk); }
 
 .demo-strip { background: #161618; color: var(--navy-ink-2); font-size: var(--fs-xs); text-align: center; padding: 7px var(--s4); letter-spacing: 0.01em; }
 .demo-strip strong { color: #fff; font-weight: 500; }
+
+/* ================= Notifications ================= */
+.notice { position: relative; display: flex; gap: 10px; width: 100%; padding: 12px 14px 12px 26px; border: 0; background: none; text-align: left; color: var(--ink); text-decoration: none !important; border-bottom: 1px solid var(--rule); transition: background var(--t-fast); }
+.notice:last-child { border-bottom: 0; }
+.notice:hover { background: var(--shelf); }
+.notice__dot { position: absolute; left: 11px; top: 18px; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+.notice__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notice__title { font-size: var(--fs-sm); color: var(--ink-2); }
+.notice.is-unread .notice__title { font-weight: 600; color: var(--ink); }
+.notice__body { font-size: var(--fs-xs); color: var(--ink-2); line-height: 1.5; }
+.notice__time { font-size: var(--fs-micro); color: var(--ink-3); margin-top: 2px; }
+.notices-page { overflow: hidden; }
+.notices-page .notice { padding: 16px 20px 16px 34px; }
+.notices-page .notice__dot { left: 16px; top: 23px; }
+.notices-pop { width: min(380px, calc(100vw - 24px)); padding: 0; overflow: hidden; }
+.notices-pop__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--rule); font-size: var(--fs-sm); }
+.notices-pop__head .link-btn { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); }
+.notices-pop__head .link-btn svg { width: 14px; height: 14px; }
+.notices-pop__list { max-height: min(420px, 60vh); overflow-y: auto; }
+.notices-pop__empty { padding: 20px 14px; margin: 0; }
+.notices-pop__all { display: block; padding: 12px 14px; border-top: 1px solid var(--rule); text-align: center; font-size: var(--fs-sm); font-weight: 500; color: var(--ink); text-decoration: none !important; }
+.notices-pop__all:hover { background: var(--shelf); }
+@media (max-width: 480px) {
+  /* The bell sits near the middle of a phone header: pin the panel to the screen edges instead. */
+  .hdr .notices-pop { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; }
+}
+.push-optin { margin-bottom: var(--s4); }
+.push-optin__icon { width: 22px; height: 22px; flex: none; stroke-width: 1.5; }
+.push-optin--compact { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 10px 14px; border-top: 1px solid var(--rule); background: var(--shelf); }
+p.push-optin--compact { display: block; }
+
+/* Refresh button with "Updated hh:mm" (ui/refresh.tsx) */
+.refresh { display: inline-flex; align-items: center; gap: 10px; }
+.refresh .btn[aria-busy="true"] svg, .refresh .btn.is-busy svg { animation: spin 0.9s linear infinite; }
+@media (max-width: 520px) { .refresh__time { display: none; } }

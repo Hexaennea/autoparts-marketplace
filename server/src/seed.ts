@@ -222,7 +222,8 @@ const FIT_FOR_PENDING: FitSpec[] = [
 export async function seedDemo(db: Db, settings: Settings): Promise<Record<string, number>> {
   const rng = new Rng(20261110);
   const created = ago(120, rng);
-  await createUser(db, ADMIN_EMAIL, "Platform Admin", "admin", ADMIN_PASSWORD, null, created);
+  const adminId = await createUser(db, ADMIN_EMAIL, "Platform Admin", "admin", ADMIN_PASSWORD, null, created);
+  await db.execute("UPDATE users SET is_super_admin = true WHERE id = ?", [adminId]); // the owner account
 
   const sellerIds: number[] = [];
   for (const s of SELLERS) {

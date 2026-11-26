@@ -35,6 +35,9 @@ button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+/* Page headings get focus on navigation (lib/router.tsx) so screen readers announce the new page;
+   they are not controls, so no focus ring. */
+[tabindex="-1"]:focus { outline: none; }
 .carton :focus-visible, .on-carton :focus-visible, .on-night :focus-visible { outline-color: #fff; }
 
 table { border-collapse: collapse; width: 100%; }

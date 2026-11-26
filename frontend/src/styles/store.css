@@ -64,18 +64,25 @@
 
 @media (max-width: 900px) {
   .hdr { position: static; }
-  .hdr__row { grid-template-columns: auto 1fr; height: auto; padding-top: 14px; padding-bottom: 14px; row-gap: 14px; }
+  .hdr__row { grid-template-columns: auto minmax(0, 1fr); height: auto; padding-top: 14px; padding-bottom: 14px; row-gap: 14px; }
   .hdr__actions { justify-self: end; gap: 0; }
-  .search { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+  .search { grid-column: 1 / -1; grid-row: 2; max-width: none; min-width: 0; }
   .hdr-action__text { display: none; }
   .hdr .plate span { max-width: 132px; }
   .plate__long { display: none; }
   .ftr__grid { grid-template-columns: 1fr 1fr; gap: var(--s10); }
 }
 @media (max-width: 480px) {
-  .hdr .plate { padding: 0 10px; }
-  .hdr .plate span { max-width: 84px; }
-  .logo__word { letter-spacing: 0.18em; }
+  /* Small phones: logo, car plate, account and cart share one row, so spacing tightens and the
+     plate text gives way (ellipsis) before anything overlaps. */
+  .hdr__row { column-gap: var(--s3); }
+  .hdr__actions { min-width: 0; justify-self: stretch; justify-content: flex-end; }
+  .hdr .plate { min-width: 36px; gap: 6px; padding: 0 8px; }
+  .hdr .plate span { max-width: 84px; min-width: 0; }
+  .hdr-action { padding: 0 5px; }
+  .logo { gap: 8px; }
+  .logo__mark { width: 24px; height: 24px; }
+  .logo__word { letter-spacing: 0.14em; }
   .search__go { padding: 0 var(--s3); }
 }
 
@@ -390,6 +397,15 @@
 .review-lines li { display: flex; gap: var(--s3); padding: 12px var(--s6); border-bottom: 1px solid var(--rule); font-size: var(--fs-sm); }
 .review-lines li:last-child { border-bottom: 0; }
 .paybox__amount { font-size: var(--fs-4xl); margin-top: 4px; }
+/* Shopper order filters: status tabs, then search and date. */
+.order-filters { margin-bottom: var(--s4); }
+.order-filters .toolbar { border-bottom: 0; }
+@media (max-width: 520px) {
+  .order-filters .tabs { padding: 0 var(--s4); gap: var(--s5); }
+  .order-filters .toolbar .input-group { min-width: 100%; max-width: none; }
+  .order-filters .toolbar .select { flex: 1; }
+}
+
 .order-row { display: block; color: inherit; text-decoration: none !important; overflow: hidden; transition: border-color var(--t); }
 .order-row:hover { border-color: var(--ink); }
 .order-row__head { display: flex; align-items: center; gap: var(--s8); padding: 14px var(--s6); background: var(--label-sunk); border-bottom: 1px solid var(--rule); flex-wrap: wrap; row-gap: 8px; }

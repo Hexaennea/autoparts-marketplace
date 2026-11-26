@@ -7,6 +7,7 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/components.css";
 import "./styles/store.css";
+import { PushBridge } from "./ui/notifications";
 import "./styles/portal.css";
 
 const root = document.getElementById("root");
@@ -19,6 +20,7 @@ if (root) {
             <AuthProvider>
               <VehicleProvider>
                 <CartProvider>
+                  <PushBridge />
                   <App />
                 </CartProvider>
               </VehicleProvider>

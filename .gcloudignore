@@ -23,3 +23,11 @@ backend/
 *.db
 *.db-wal
 *.db-shm
+
+# Android/iOS app project (built separately, see docs/MOBILE-APP.md)
+mobile/
+
+# Secret keys (e.g. Firebase service account) must never be committed or deployed
+**/service_account*.json
+**/*firebase-adminsdk*.json
+**/firebase-service-account*.json

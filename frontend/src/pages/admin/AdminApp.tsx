@@ -1,14 +1,16 @@
-import { LuArrowRight, LuCar, LuChartColumn, LuClipboardCheck, LuHistory, LuPackage, LuSettings, LuStore, LuUsers, LuWallet } from "react-icons/lu";
+import { LuArrowRight, LuCar, LuChartColumn, LuClipboardCheck, LuHistory, LuPackage, LuSettings, LuShieldCheck, LuStore, LuUsers, LuWallet } from "react-icons/lu";
 import { PortalLayout } from "../../layouts/PortalLayout";
 import { rupees, rupeesShort } from "../../lib/format";
 import { useQuery } from "../../lib/query";
 import { Link, Routes } from "../../lib/router";
+import { useAuth } from "../../state/app";
 import { DailyBars } from "../../ui/chart";
 import { Card, ErrorState, PageHeader, Skeleton } from "../../ui/core";
 import { NotFound } from "../store/NotFound";
 import { CatalogPage } from "./Catalog";
 import { AdminListingPage, AdminOrderPage, AdminOrdersPage, ModerationPage, PayoutsAdminPage, SettingsPage } from "./Operations";
 import { AuditPage, SellerReviewPage, SellersPage, UsersPage } from "./People";
+import { AdminsPage, ChoosePasswordPage } from "./Admins";
 
 interface Dash {
   kpis: { gmv_30d: number; commission_30d: number; orders_30d: number; new_buyers_30d: number; active_sellers: number; pending_sellers: number; pending_listings: number; active_listings: number; open_returns: number; late_shipments: number };
@@ -63,6 +65,13 @@ function Dashboard() {
 }
 
 export default function AdminApp() {
+  const { user } = useAuth();
+  // Until a new (or reset) admin picks their own password, the server refuses the admin API.
+  if (user?.must_change_password) return <ChoosePasswordPage />;
+  return <AdminPortal superAdmin={Boolean(user?.is_super_admin)} />;
+}
+
+function AdminPortal({ superAdmin }: { superAdmin: boolean }) {
   const q = useQuery<Dash>("/api/admin/dashboard");
   const k = q.data?.kpis;
   return (
@@ -76,6 +85,7 @@ export default function AdminApp() {
         { to: "/admin/payouts", label: "Payouts", icon: LuWallet },
         { to: "/admin/catalog", label: "Vehicles & catalogue", icon: LuCar },
         { to: "/admin/users", label: "Users", icon: LuUsers },
+        ...(superAdmin ? [{ to: "/admin/admins", label: "Admins", icon: LuShieldCheck }] : []),
         { to: "/admin/audit", label: "Audit log", icon: LuHistory },
         { to: "/admin/settings", label: "Settings", icon: LuSettings },
       ]}
@@ -93,6 +103,7 @@ export default function AdminApp() {
           { path: "/admin/payouts", render: () => <PayoutsAdminPage /> },
           { path: "/admin/catalog", render: () => <CatalogPage /> },
           { path: "/admin/users", render: () => <UsersPage /> },
+          ...(superAdmin ? [{ path: "/admin/admins", render: () => <AdminsPage /> }] : []),
           { path: "/admin/audit", render: () => <AuditPage /> },
           { path: "/admin/settings", render: () => <SettingsPage /> },
         ]}

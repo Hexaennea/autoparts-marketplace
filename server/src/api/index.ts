@@ -6,3 +6,5 @@ import "./catalog.js";
 import "./orders.js";
 import "./seller.js";
 import "./admin.js";
+import "./notifications.js";
+import "./admins.js";

@@ -1,26 +1,66 @@
-import { useState } from "react";
-import { LuChevronRight, LuCircleCheck, LuPackage, LuStore } from "react-icons/lu";
+import { useEffect, useState } from "react";
+import { LuChevronRight, LuCircleCheck, LuDownload, LuPackage, LuSearch, LuStore } from "react-icons/lu";
 import emptyArt from "../../assets/art/battery.svg";
 import { api, ApiError, errorMessage } from "../../lib/api";
 import { date, dateTime, gstPercent, rupees, rupeesRounded } from "../../lib/format";
-import { invalidate, useQuery } from "../../lib/query";
+import { invalidate, useDebounced, useQuery } from "../../lib/query";
 import { Link, useSearchParams } from "../../lib/router";
 import type { Fulfilment, Order, Paged } from "../../lib/types";
 import { useToast } from "../../state/app";
 import { FALLBACK_ART, StatusBadge, SummaryRows, TrackingRoute } from "../../ui/commerce";
-import { Alert, Button, Dialog, Empty, ErrorState, Field, PageHeader, Pagination, Skeleton } from "../../ui/core";
+import { Alert, Button, Dialog, Empty, ErrorState, Field, PageHeader, Pagination, Skeleton, Tabs } from "../../ui/core";
+
+type StatusTab = "" | "active" | "delivered" | "returns" | "cancelled";
+const PERIODS = [
+  { value: "", label: "Any time" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "6m", label: "Last 6 months" },
+  { value: "1y", label: "Last 1 year" },
+];
 
 export function OrdersPage() {
   const [params, update] = useSearchParams();
   const page = Number(params.get("page") ?? 1) || 1;
-  const orders = useQuery<Paged<Order>>("/api/orders", { page });
+  const status = (params.get("status") ?? "") as StatusTab;
+  const period = params.get("period") ?? "";
+  const [text, setText] = useState(params.get("q") ?? "");
+  const q = useDebounced(text.trim(), 300);
+  useEffect(() => { if ((params.get("q") ?? "") !== q) update({ q: q || null, page: null }, true); }, [q, params, update]);
+  const orders = useQuery<Paged<Order> & { counts: Record<string, number> }>("/api/orders", { page, status, period, q: params.get("q") ?? "" });
   const data = orders.data;
+  const c = data?.counts ?? {};
+  const filtered = Boolean(status || period || params.get("q"));
+  const neverOrdered = data?.total === 0 && !filtered;
   return (
     <div className="container page">
-      <PageHeader title="Your orders" />
+      <PageHeader title="Orders" />
+      {!neverOrdered && (
+        <div className="card order-filters">
+          <Tabs<StatusTab>
+            label="Order status"
+            value={status}
+            onChange={(s) => update({ status: s || null, page: null })}
+            items={[
+              { value: "", label: "All", count: c.all },
+              { value: "active", label: "In progress", count: c.active },
+              { value: "delivered", label: "Delivered", count: c.delivered },
+              { value: "returns", label: "Returns", count: c.returns },
+              { value: "cancelled", label: "Cancelled", count: c.cancelled },
+            ]}
+          />
+          <div className="toolbar">
+            <div className="input-group"><LuSearch aria-hidden="true" /><input className="input" type="search" placeholder="Order number or part name" aria-label="Search orders" maxLength={60} value={text} onChange={(e) => setText(e.target.value)} /></div>
+            <select className="select" aria-label="Order date" value={period} onChange={(e) => update({ period: e.target.value || null, page: null })}>
+              {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+            {filtered && <Button variant="ghost" size="sm" onClick={() => { setText(""); update({ status: null, period: null, q: null, page: null }); }}>Clear filters</Button>}
+          </div>
+        </div>
+      )}
       {orders.error && <ErrorState message={orders.error.message} onRetry={orders.reload} />}
       {!data && orders.loading && <div className="stack">{[0, 1, 2].map((i) => <Skeleton key={i} height={120} />)}</div>}
-      {data?.total === 0 && <Empty art={emptyArt} title="No orders yet" action={<Button to="/search" variant="primary">Find parts</Button>}>When you order parts, you'll track every shipment here.</Empty>}
+      {neverOrdered && <Empty art={emptyArt} title="No orders yet" action={<Button to="/search" variant="primary">Find parts</Button>}>When you order parts, you'll track every shipment here.</Empty>}
+      {data?.total === 0 && filtered && <Empty art={emptyArt} title="No orders match">Try another tab, a different search or a longer time period.</Empty>}
       <div className="stack" style={{ "--gap": "12px" }}>
         {data?.items.map((o) => (
           <Link key={o.id} to={`/orders/${o.id}`} className="order-row card">
@@ -86,6 +126,9 @@ function Shipment({ order, f, onChange }: { order: Order; f: Fulfilment; onChang
         {!terminal && <TrackingRoute status={f.status} events={f.events} />}
         {f.tracking_number && (
           <div className="tracking"><LuPackage aria-hidden="true" /><span className="small">{f.carrier} tracking <span className="pn strong">{f.tracking_number}</span></span></div>
+        )}
+        {f.invoice_number && (
+          <div className="row row--wrap"><a className="btn btn--secondary btn--sm" href={`/api/orders/${order.id}/fulfilments/${f.id}/invoice.pdf`} download><LuDownload aria-hidden="true" /> GST invoice</a><span className="small muted">Invoice <span className="pn">{f.invoice_number}</span></span></div>
         )}
         {f.status === "cancelled" && <Alert kind="bad" title="Cancelled">{f.cancel_reason}{f.refund_paise ? ` · ${rupees(f.refund_paise)} refunded` : ""}</Alert>}
         {f.status === "return_requested" && <Alert kind="warn" title="Return requested">{f.return_reason}</Alert>}

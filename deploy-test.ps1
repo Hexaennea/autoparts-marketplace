@@ -82,7 +82,16 @@ if (-not (Test-Secret "pp-session-secret")) {
 # The Cloud Run app runs as the project's default compute account: let it read the secrets and build.
 $number = (& gcloud projects describe $Project --account=$Account --format="value(projectNumber)").Trim()
 $runAccount = "$number-compute@developer.gserviceaccount.com"
-foreach ($s in "pp-database-url", "pp-supabase-secret-key", "pp-session-secret") {
+$secretNames = @("pp-database-url", "pp-supabase-secret-key", "pp-session-secret")
+# Firebase server key for push notifications (file kept outside the project, path in server\.env).
+$fcmFile = $cfg["FCM_SERVICE_ACCOUNT_FILE"]
+if ($fcmFile -and (Test-Path $fcmFile)) {
+  Set-Secret "pp-fcm-service-account" ([IO.File]::ReadAllText($fcmFile))
+  $secretNames += "pp-fcm-service-account"
+} else {
+  Write-Host "  Firebase key not found: push notifications will be off on the test site" -ForegroundColor Yellow
+}
+foreach ($s in $secretNames) {
   Invoke-Gcloud secrets add-iam-policy-binding $s "--member=serviceAccount:$runAccount" --role=roles/secretmanager.secretAccessor | Out-Null
 }
 Invoke-Gcloud projects add-iam-policy-binding $Project "--member=serviceAccount:$runAccount" --role=roles/run.builder --condition=None | Out-Null
@@ -99,6 +108,7 @@ $envVars = @(
   "PARTPILOT_MEDIA_BUCKET=$bucket"
 ) -join ","
 $secrets = "DATABASE_URL=pp-database-url:latest,SUPABASE_SECRET_KEY=pp-supabase-secret-key:latest,PARTPILOT_SECRET_KEY=pp-session-secret:latest"
+if ($secretNames -contains "pp-fcm-service-account") { $secrets += ",FCM_SERVICE_ACCOUNT=pp-fcm-service-account:latest" }
 Invoke-Gcloud run deploy $Service --source . --region=$Region --port=8000 --allow-unauthenticated `
   --memory=512Mi --cpu=1 --min-instances=0 --max-instances=1 `
   "--set-env-vars=$envVars" "--set-secrets=$secrets"

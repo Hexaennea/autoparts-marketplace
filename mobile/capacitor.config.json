@@ -1,0 +1,15 @@
+{
+  "appId": "com.harsivautotech.partpilot",
+  "appName": "PartPilot",
+  "webDir": "www",
+  "server": {
+    "url": "https://partpilot-mn2miqghfq-el.a.run.app",
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

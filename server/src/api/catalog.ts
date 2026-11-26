@@ -109,28 +109,33 @@ api.route("GET", "/api/home", { query: HomeQuery }, async (ctx) => {
       " WHERE f.product_id = p.id AND f.variant_id = ?))";
     params.push(variantId);
   }
-  const popular = await ctx.db.all(
-    `${PRODUCT_CARD_SELECT} WHERE p.status = 'active' AND s.kyc_status = 'approved' AND p.stock > 0${fitClause}` +
-      // One card per part number: the best-selling listing represents it.
-      " AND p.id = (SELECT p2.id FROM products p2 JOIN sellers s2 ON s2.id = p2.seller_id" +
-      " WHERE p2.part_number = p.part_number AND p2.status = 'active' AND s2.kyc_status = 'approved'" +
-      " AND p2.stock > 0 ORDER BY p2.sold_count DESC, p2.id LIMIT 1)" +
-      " ORDER BY p.sold_count DESC, p.rating_avg DESC LIMIT 10",
-    params,
-  );
-  const topBrands = await ctx.db.all(
-    `SELECT b.name, b.slug, b.is_oem, COUNT(*) AS count FROM products p JOIN brands b ON b.id = p.brand_id
-     WHERE p.status = 'active' GROUP BY b.id ORDER BY b.is_oem DESC, count DESC LIMIT 30`,
-  );
-  const stats = await ctx.db.one(`SELECT (SELECT COUNT(*) FROM products WHERE status = 'active') AS parts,
+  // Independent reads run together (the database can be a long round trip away).
+  const [popular, topBrands, stats, categories, vehicle] = await Promise.all([
+    ctx.db.all(
+      `${PRODUCT_CARD_SELECT} WHERE p.status = 'active' AND s.kyc_status = 'approved' AND p.stock > 0${fitClause}` +
+        // One card per part number: the best-selling listing represents it.
+        " AND p.id = (SELECT p2.id FROM products p2 JOIN sellers s2 ON s2.id = p2.seller_id" +
+        " WHERE p2.part_number = p.part_number AND p2.status = 'active' AND s2.kyc_status = 'approved'" +
+        " AND p2.stock > 0 ORDER BY p2.sold_count DESC, p2.id LIMIT 1)" +
+        " ORDER BY p.sold_count DESC, p.rating_avg DESC LIMIT 10",
+      params,
+    ),
+    ctx.db.all(
+      `SELECT b.name, b.slug, b.is_oem, COUNT(*) AS count FROM products p JOIN brands b ON b.id = p.brand_id
+       WHERE p.status = 'active' GROUP BY b.id ORDER BY b.is_oem DESC, count DESC LIMIT 30`,
+    ),
+    ctx.db.one(`SELECT (SELECT COUNT(*) FROM products WHERE status = 'active') AS parts,
                   (SELECT COUNT(*) FROM sellers WHERE kyc_status = 'approved') AS sellers,
-                  (SELECT COUNT(*) FROM variants WHERE is_active) AS variants`);
+                  (SELECT COUNT(*) FROM variants WHERE is_active) AS variants`),
+    categoryTree(ctx.db),
+    variantId ? getVariant(ctx.db, variantId) : Promise.resolve(null),
+  ]);
   return {
-    categories: await categoryTree(ctx.db),
+    categories,
     popular: await cardsWithFit(ctx.db, popular, variantId),
     brands: topBrands.map((b) => ({ ...b, is_oem: Boolean(b.is_oem) })),
     stats,
-    vehicle: variantId ? await getVariant(ctx.db, variantId) : null,
+    vehicle,
   };
 });
 
@@ -242,36 +247,33 @@ const ProductQuery = z.object({
 
 api.route("GET", "/api/products/{product_id:int}", { query: ProductQuery }, async (ctx) => {
   const productId = pathInt(ctx, "product_id");
-  const row = await visibleProduct(ctx, productId);
-  const images = await ctx.db.all(
-    "SELECT id, path, thumb_path, width, height FROM media WHERE product_id = ? ORDER BY position, id",
-    [productId],
-  );
-  const specs = await ctx.db.all("SELECT label, value FROM product_specs WHERE product_id = ? ORDER BY position", [
-    productId,
+  // The database can be a long round trip away, so independent reads run together. Nothing is
+  // returned unless visibleProduct passes (it throws 404 otherwise).
+  const [row, images, specs, numbers, fitmentRows, vehicle, ratingRows] = await Promise.all([
+    visibleProduct(ctx, productId),
+    ctx.db.all("SELECT id, path, thumb_path, width, height FROM media WHERE product_id = ? ORDER BY position, id", [productId]),
+    ctx.db.all("SELECT label, value FROM product_specs WHERE product_id = ? ORDER BY position", [productId]),
+    ctx.db.all("SELECT number, kind FROM product_part_numbers WHERE product_id = ? ORDER BY kind DESC, number", [productId]),
+    ctx.db.all("SELECT variant_id FROM product_fitments WHERE product_id = ?", [productId]),
+    ctx.query.vehicle ? getVariant(ctx.db, ctx.query.vehicle) : Promise.resolve(null),
+    ctx.db.all("SELECT rating, COUNT(*) AS n FROM reviews WHERE product_id = ? GROUP BY rating", [productId]),
   ]);
-  const numbers = await ctx.db.all(
-    "SELECT number, kind FROM product_part_numbers WHERE product_id = ? ORDER BY kind DESC, number",
-    [productId],
-  );
-  const variantIds = (await ctx.db.all("SELECT variant_id FROM product_fitments WHERE product_id = ?", [productId])).map(
-    (r) => r.variant_id as number,
-  );
-  const fitments = await variantsByIds(ctx.db, variantIds);
-  const vehicle = ctx.query.vehicle ? await getVariant(ctx.db, ctx.query.vehicle) : null;
+  const variantIds = fitmentRows.map((r) => r.variant_id as number);
   let fits: boolean | null = null;
   if (vehicle) fits = Boolean(row.is_universal) || variantIds.includes(vehicle.id);
 
   const norms = numbers.map((n) => normalizePartNumber(n.number));
-  let others: Row[] = [];
-  if (norms.length) {
-    others = await ctx.db.all(
-      `${PRODUCT_CARD_SELECT} WHERE p.id <> ? AND p.status = 'active' AND s.kyc_status = 'approved'
-         AND p.id IN (SELECT product_id FROM product_part_numbers WHERE number_norm IN (${placeholders(norms)}))
-         ORDER BY p.price_paise LIMIT 6`,
-      [productId, ...norms],
-    );
-  }
+  const [fitments, others] = await Promise.all([
+    variantsByIds(ctx.db, variantIds),
+    norms.length
+      ? ctx.db.all(
+          `${PRODUCT_CARD_SELECT} WHERE p.id <> ? AND p.status = 'active' AND s.kyc_status = 'approved'
+             AND p.id IN (SELECT product_id FROM product_part_numbers WHERE number_norm IN (${placeholders(norms)}))
+             ORDER BY p.price_paise LIMIT 6`,
+          [productId, ...norms],
+        )
+      : Promise.resolve([] as Row[]),
+  ]);
   const seen = [productId, ...others.map((o) => o.id as number)]; // don't repeat the "other sellers" rail
   const relatedParams: unknown[] = [row.category_id, ...seen];
   let relatedFit = "";
@@ -287,14 +289,14 @@ api.route("GET", "/api/products/{product_id:int}", { query: ProductQuery }, asyn
     relatedParams,
   );
   const distribution = new Map<number, number>();
-  for (const r of await ctx.db.all("SELECT rating, COUNT(*) AS n FROM reviews WHERE product_id = ? GROUP BY rating", [
-    productId,
-  ])) {
-    distribution.set(r.rating, r.n);
-  }
+  for (const r of ratingRows) distribution.set(r.rating, r.n);
   const ratingDistribution: Record<string, number> = {};
   for (let k = 5; k >= 1; k--) ratingDistribution[String(k)] = distribution.get(k) ?? 0;
   const vehicleId = vehicle ? vehicle.id : null;
+  const [otherCards, relatedCards] = await Promise.all([
+    cardsWithFit(ctx.db, others, vehicleId),
+    cardsWithFit(ctx.db, related, vehicleId),
+  ]);
   return {
     id: row.id,
     sku: row.sku,
@@ -345,8 +347,8 @@ api.route("GET", "/api/products/{product_id:int}", { query: ProductQuery }, asyn
     fitment_count: fitments.length,
     vehicle,
     fits,
-    other_sellers: await cardsWithFit(ctx.db, others, vehicleId),
-    related: await cardsWithFit(ctx.db, related, vehicleId),
+    other_sellers: otherCards,
+    related: relatedCards,
   };
 });
 

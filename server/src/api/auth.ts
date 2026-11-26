@@ -26,7 +26,7 @@ const PasswordIn = z.object({
 
 export async function userPayload(db: Db, userId: number) {
   const row = await db.one(
-    `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.created_at,
+    `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.created_at, u.is_super_admin, u.must_change_password,
             s.id AS seller_id, s.kyc_status, s.display_name, s.kyc_note
      FROM users u LEFT JOIN sellers s ON s.user_id = u.id WHERE u.id = ?`,
     [userId],
@@ -42,6 +42,8 @@ export async function userPayload(db: Db, userId: number) {
     full_name: row.full_name,
     phone: row.phone,
     role: row.role,
+    is_super_admin: Boolean(row.is_super_admin),
+    must_change_password: Boolean(row.must_change_password),
     created_at: row.created_at,
     seller,
   };
@@ -173,7 +175,7 @@ api.route("POST", "/api/auth/password", { auth: "user", body: PasswordIn, rate: 
   if (problems.length) {
     throw new ApiError(422, "weak_password", problems[0], { fields: { new_password: problems.join(" ") } });
   }
-  await ctx.db.execute("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?", [
+  await ctx.db.execute("UPDATE users SET password_hash = ?, must_change_password = false, updated_at = ? WHERE id = ?", [
     await hashPassword(body.new_password),
     utcnow(),
     user.id,

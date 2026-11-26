@@ -10,7 +10,7 @@ import { TRANSMISSION_LABEL, VARIANT_SELECT, categoryTree, mediaUrl, variantOut 
 import { SETTING_KEYS, STATUS_LABEL, cancelUnpaidOrder, getSettings } from "../services/commerce.js";
 import { listingEditable, setStatus } from "../services/listings.js";
 import { Int, LongText, Text, optional, slugify } from "../util.js";
-import { fulfilmentOut, orderOut } from "./orders.js";
+import { fulfilmentOut, invoiceResponse, orderOut } from "./orders.js";
 import { FulfilmentActionIn, applyFulfilmentAction, payoutLines } from "./seller.js";
 
 /** LIKE pattern with %, _ and \ escaped (used with ESCAPE '\'). */
@@ -31,6 +31,18 @@ const PageQuery = z.object({
 });
 
 const LIVE = "('placed','packed','shipped','delivered','return_requested')";
+
+/** Admin order tabs: an order is in a tab when any of its shipments is in one of these states. */
+const ADMIN_ORDER_GROUPS: Record<string, string[]> = {
+  to_ship: ["placed", "packed"],
+  shipped: ["shipped"],
+  delivered: ["delivered"],
+  returns: ["return_requested", "returned"],
+  cancelled: ["cancelled"],
+  unpaid: ["pending_payment"],
+};
+const hasShipmentIn = (states: string[]) =>
+  `EXISTS (SELECT 1 FROM fulfilments f WHERE f.order_id = o.id AND f.status IN (${states.map((s) => `'${s}'`).join(",")}))`;
 
 // ---- dashboard -------------------------------------------------------------------------------------------
 
@@ -630,16 +642,24 @@ api.route("PATCH", "/api/admin/brands/{brand_id:int}", { auth: "admin", body: Br
 
 api.route("GET", "/api/admin/orders", { auth: "admin", query: PageQuery }, async (ctx) => {
   const q = ctx.query;
-  const where = ["1=1"];
-  const params: unknown[] = [];
-  if (q.status) {
-    where.push("EXISTS (SELECT 1 FROM fulfilments f WHERE f.order_id = o.id AND f.status = ?)");
-    params.push(q.status);
-  }
+  // Search narrows everything, tab counts included; the status tab is applied on top.
+  const base = ["1=1"];
+  const baseParams: unknown[] = [];
   if (q.q.trim()) {
-    where.push("(o.number ILIKE ? ESCAPE '\\' OR u.email ILIKE ? ESCAPE '\\' OR o.ship_name ILIKE ? ESCAPE '\\')");
+    base.push("(o.number ILIKE ? ESCAPE '\\' OR u.email ILIKE ? ESCAPE '\\' OR o.ship_name ILIKE ? ESCAPE '\\')");
     const pattern = like(q.q);
-    params.push(pattern, pattern, pattern);
+    baseParams.push(pattern, pattern, pattern);
+  }
+  const where = [...base];
+  const params = [...baseParams];
+  if (q.status) {
+    const group = ADMIN_ORDER_GROUPS[q.status];
+    if (group) {
+      where.push(hasShipmentIn(group));
+    } else {
+      where.push("EXISTS (SELECT 1 FROM fulfilments f WHERE f.order_id = o.id AND f.status = ?)");
+      params.push(q.status);
+    }
   }
   const clause = where.join(" AND ");
   const { limit, offset } = paginate(q.page, q.per_page);
@@ -659,7 +679,13 @@ api.route("GET", "/api/admin/orders", { auth: "admin", query: PageQuery }, async
     r.statuses = statuses;
     r.status_labels = statuses.map((s) => STATUS_LABEL[s]);
   }
-  return { items: rows, ...pageMeta(total, q.page, limit) };
+  // An order with several sellers can sit in more than one tab, so tabs may add up to more than All.
+  const groupCounts = Object.entries(ADMIN_ORDER_GROUPS).map(([k, g]) => `COUNT(*) FILTER (WHERE ${hasShipmentIn(g)}) AS ${k}`);
+  const counts = await ctx.db.one(
+    `SELECT COUNT(*) AS "all", ${groupCounts.join(", ")} FROM orders o JOIN users u ON u.id = o.buyer_id WHERE ${base.join(" AND ")}`,
+    baseParams,
+  );
+  return { items: rows, counts, ...pageMeta(total, q.page, limit) };
 });
 
 api.route("GET", "/api/admin/orders/{order_id:int}", { auth: "admin" }, async (ctx) => {
@@ -689,6 +715,12 @@ api.route("GET", "/api/admin/orders/{order_id:int}", { auth: "admin" }, async (c
     [order.id],
   );
   return out;
+});
+
+api.route("GET", "/api/admin/fulfilments/{fulfilment_id:int}/invoice.pdf", { auth: "admin" }, async (ctx) => {
+  const f = await ctx.db.one("SELECT * FROM fulfilments WHERE id = ?", [pathInt(ctx, "fulfilment_id")]);
+  if (!f) throw notFound("Shipment");
+  return invoiceResponse(ctx, f);
 });
 
 const ADMIN_FULFILMENT_ACTIONS = new Set(["deliver", "cancel", "accept_return", "reject_return"]);
@@ -758,7 +790,7 @@ api.route(
     const target = await ctx.db.one("SELECT id, role, status FROM users WHERE id = ?", [userId]);
     if (!target) throw notFound("User");
     if (target.id === ctx.requireUser().id) throw forbidden("You can't change your own account status.");
-    if (target.role === "admin") throw forbidden("Admin accounts are managed from the command line.");
+    if (target.role === "admin") throw forbidden("Manage admin accounts from the Admins page (super admins only).");
     const b = ctx.body;
     await ctx.db.execute("UPDATE users SET status = ?, updated_at = ? WHERE id = ?", [b.status, utcnow(), userId]);
     if (b.status === "suspended") await destroyUserSessions(ctx.db, userId);

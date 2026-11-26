@@ -13,6 +13,7 @@ import { ProductPage } from "./pages/store/Product";
 import { SearchPage } from "./pages/store/Search";
 import { SellPage } from "./pages/store/Sell";
 import { useAuth } from "./state/app";
+import { NotificationsPage } from "./ui/notifications";
 import type { Role } from "./lib/types";
 
 const SellerApp = lazy(() => import("./pages/seller/SellerApp"));
@@ -72,6 +73,7 @@ export function App() {
           { path: "/orders/:id", render: (p) => <RequireAuth><OrderPage id={Number(p.id)} /></RequireAuth> },
           { path: "/orders/:id/pay", render: (p) => <RequireAuth><PaymentPage id={Number(p.id)} /></RequireAuth> },
           { path: "/account", render: () => <RequireAuth><AccountPage /></RequireAuth> },
+          { path: "/notifications", render: () => <RequireAuth><div className="container page"><NotificationsPage /></div></RequireAuth> },
           { path: "/login", render: () => <LoginPage /> },
           { path: "/register", render: () => <RegisterPage /> },
           { path: "/sell", render: () => <SellPage /> },

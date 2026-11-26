@@ -8,6 +8,7 @@ import { DAY, type Db, MINUTE, type Row, addMs, placeholders, utcnow } from "../
 import { ApiError, badRequest, conflict } from "../http.js";
 import { bpsOf, gstIncluded } from "../util.js";
 import { mediaUrl } from "./catalog.js";
+import { orderPlacedNotices, shipmentNotice, unpaidCancelledNotice } from "./notify.js";
 
 // ---- runtime settings (admin-editable) -----------------------------------------------------------
 
@@ -251,6 +252,7 @@ export async function transition(
     [fulfilment.id, target, note, actorUserId, now],
   );
   fulfilment.status = target;
+  await shipmentNotice(db, fulfilment, action, note);
   return target;
 }
 
@@ -285,6 +287,8 @@ export async function cancelUnpaidOrder(
       "UPDATE orders SET payment_status = 'failed', updated_at = ? WHERE id = ? AND payment_status IN ('pending', 'failed')",
       [now, orderId],
     );
+    // A buyer or admin cancelling sees it happen; an expiry needs telling.
+    if (actor === "system") await unpaidCancelledNotice(db, orderId);
   }
   return cancelled;
 }
@@ -482,6 +486,7 @@ export async function placeOrder(
   }
   await db.execute("DELETE FROM cart_items WHERE user_id = ?", [buyerId]);
   if (online) await createPaymentIntent(db, orderId, quote.totalPaise);
+  else await orderPlacedNotices(db, orderId); // online orders are announced once paid (settlePayment)
   return orderId;
 }
 
@@ -524,6 +529,7 @@ export async function settlePayment(
     for (const f of await db.all("SELECT * FROM fulfilments WHERE order_id = ? AND status = 'pending_payment'", [orderId])) {
       await transition(db, f, "pay", "system", actorUserId, "Payment received");
     }
+    await orderPlacedNotices(db, orderId);
   } else {
     await db.execute("UPDATE orders SET payment_status = 'failed', updated_at = ? WHERE id = ?", [now, orderId]);
   }

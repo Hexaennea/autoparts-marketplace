@@ -18,6 +18,7 @@ pg.types.setTypeParser(20, (v) => Number(v)); // int8
 pg.types.setTypeParser(1700, (v) => Number(v)); // numeric (SUM/AVG results)
 pg.types.setTypeParser(1184, (v) => isoUtc(new Date(v))); // timestamptz
 pg.types.setTypeParser(1114, (v) => isoUtc(new Date(`${v}Z`))); // timestamp (no tz) treated as UTC
+pg.types.setTypeParser(1082, (v) => v); // date: keep "YYYY-MM-DD" (no time zone shift)
 
 export type Row = Record<string, any>;
 export type Params = readonly unknown[];

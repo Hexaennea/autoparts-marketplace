@@ -6,20 +6,23 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --watch",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.sw.json --noEmit",
     "typecheck:offline": "tsc -p tsconfig.offline.json --noEmit",
     "test": "node --test --experimental-strip-types src/lib/*.test.ts"
   },
   "dependencies": {
+    "@capacitor/core": "7.6.10",
+    "@capacitor/push-notifications": "7.0.7",
+    "firebase": "11.10.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-icons": "5.7.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "esbuild": "0.28.2",
-    "typescript": "6.0.3",
-    "@types/node": "^22.0.0"
+    "typescript": "6.0.3"
   }
 }

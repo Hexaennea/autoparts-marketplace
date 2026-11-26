@@ -15,3 +15,8 @@ server/dist/
 server/uploads/
 
 .env*
+
+# Secret keys (e.g. Firebase service account) must never be committed or deployed
+**/service_account*.json
+**/*firebase-adminsdk*.json
+**/firebase-service-account*.json

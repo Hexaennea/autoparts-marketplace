@@ -90,12 +90,13 @@ async function main(argv: string[]): Promise<number> {
           if (await db.scalar("SELECT 1 FROM users WHERE email = ?", [email])) return false;
           const now = utcnow();
           await db.execute(
-            "INSERT INTO users (email, password_hash, full_name, role, created_at, updated_at) VALUES (?, ?, ?, 'admin', ?, ?)",
+            // Command-line admins are super admins: this is how the owner gets the first account.
+            "INSERT INTO users (email, password_hash, full_name, role, is_super_admin, created_at, updated_at) VALUES (?, ?, ?, 'admin', true, ?, ?)",
             [email, await hashPassword(password), name, now, now],
           );
           return true;
         });
-        console.log(created ? "Admin created." : "A user with this email already exists.");
+        console.log(created ? "Super admin created." : "A user with this email already exists.");
         return created ? 0 : 1;
       }
       case "expire-unpaid":

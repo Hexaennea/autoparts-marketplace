@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LuArrowRight, LuPackageCheck, LuPrinter, LuSearch, LuTruck } from "react-icons/lu";
+import { LuArrowRight, LuDownload, LuPackageCheck, LuPrinter, LuSearch, LuTruck } from "react-icons/lu";
 import emptyArt from "../../assets/art/timing-belt.svg";
 import { api, ApiError, errorMessage } from "../../lib/api";
 import { date, dateTime, gstPercent, rupees } from "../../lib/format";
@@ -8,6 +8,8 @@ import { Link, useSearchParams } from "../../lib/router";
 import type { Fulfilment, Paged } from "../../lib/types";
 import { useToast } from "../../state/app";
 import { Barcode, FALLBACK_ART, StatusBadge, SummaryRows, TrackingRoute } from "../../ui/commerce";
+import { RefreshButton } from "../../ui/refresh";
+import { refreshUnread } from "../../ui/notifications";
 import { Alert, Button, Card, Dialog, Empty, ErrorState, Field, PageHeader, Pagination, Skeleton, Tabs } from "../../ui/core";
 
 interface Row {
@@ -16,7 +18,7 @@ interface Row {
   payment_method: string; units: number; first_item: string;
 }
 
-type Tab = "to_ship" | "shipped" | "delivered" | "return_requested" | "cancelled" | "";
+type Tab = "to_ship" | "shipped" | "delivered" | "returns" | "cancelled" | "all";
 
 export function SellerOrdersPage() {
   const [params, update] = useSearchParams();
@@ -25,21 +27,22 @@ export function SellerOrdersPage() {
   const [text, setText] = useState(params.get("q") ?? "");
   const q = useDebounced(text, 300);
   useEffect(() => { if ((params.get("q") ?? "") !== q) update({ q: q || null, page: null }); }, [q, params, update]);
-  const list = useQuery<Paged<Row> & { counts: Record<string, number> }>("/api/seller/orders", { status: status || undefined, q: params.get("q") ?? "", page });
+  const list = useQuery<Paged<Row> & { counts: Record<string, number> }>("/api/seller/orders", { status: status === "all" ? undefined : status, q: params.get("q") ?? "", page });
   const d = list.data;
   const c = d?.counts ?? {};
   return (
     <>
-      <PageHeader title="Orders" subtitle="Pack within a day and ship within two. Buyers see every step." />
+      <PageHeader title="Orders" subtitle="Pack within a day and ship within two. Buyers see every step."
+        actions={<RefreshButton onRefresh={async () => { await list.refresh(); invalidate("/api/seller/dashboard"); void refreshUnread(); }} />} />
       <Card>
         <Tabs<Tab>
           label="Order status"
           value={status}
-          onChange={(s) => update({ status: s === "to_ship" ? null : s || "", page: null })}
+          onChange={(s) => update({ status: s === "to_ship" ? null : s, page: null })}
           items={[
             { value: "to_ship", label: "To ship", count: c.to_ship ?? 0 }, { value: "shipped", label: "Shipped", count: c.shipped ?? 0 },
-            { value: "delivered", label: "Delivered", count: c.delivered ?? 0 }, { value: "return_requested", label: "Returns", count: c.return_requested ?? 0 },
-            { value: "cancelled", label: "Cancelled", count: c.cancelled ?? 0 }, { value: "", label: "All" },
+            { value: "delivered", label: "Delivered", count: c.delivered ?? 0 }, { value: "returns", label: "Returns", count: c.returns ?? 0 },
+            { value: "cancelled", label: "Cancelled", count: c.cancelled ?? 0 }, { value: "all", label: "All", count: c.all ?? 0 },
           ]}
         />
         <div className="toolbar"><div className="input-group"><LuSearch aria-hidden="true" /><input className="input" type="search" placeholder="Order number" aria-label="Search by order number" value={text} onChange={(e) => setText(e.target.value)} /></div></div>
@@ -117,7 +120,9 @@ export function SellerOrderPage({ id }: { id: number }) {
         back={{ to: "/seller/orders", label: "Orders" }}
         actions={
           <>
+            <RefreshButton onRefresh={() => q.refresh()} />
             <Button icon={LuPrinter} onClick={() => setDialog("slip")}>Packing slip</Button>
+            {d.invoice_number && <a className="btn btn--secondary" href={`/api/seller/orders/${d.id}/invoice.pdf`} download><LuDownload aria-hidden="true" /> GST invoice</a>}
             {has("pack") && <Button variant="primary" icon={LuPackageCheck} busy={busy === "pack"} onClick={() => void act("pack")}>Mark packed</Button>}
             {has("ship") && <Button variant="primary" icon={LuTruck} onClick={() => setDialog("ship")}>Ship order</Button>}
             {has("deliver") && <Button variant="primary" busy={busy === "deliver"} onClick={() => void act("deliver")}>Mark delivered</Button>}

@@ -11,7 +11,7 @@
 
 import { type Db, type Params, placeholders } from "../db.js";
 import { normalizePartNumber } from "../util.js";
-import { PRODUCT_CARD_SELECT, type VariantOut, cardOut, categoryDescendants, fitmentMap, getVariant } from "./catalog.js";
+import { PRODUCT_CARD_SELECT, type VariantOut, cardOut, fitmentMap, getVariant } from "./catalog.js";
 
 const TOKEN = /[0-9A-Za-z]+/g;
 export const SORTS = new Set(["relevance", "price_asc", "price_desc", "newest", "rating"]);
@@ -160,31 +160,42 @@ export class Search {
     return [cte, params];
   }
 
-  /** For facets: a parent category shows its children; a leaf shows its siblings. */
-  private async categoryScope(): Promise<number | null> {
-    if (!this.p.category) return null;
-    const cat = await this.db.one("SELECT id, parent_id FROM categories WHERE slug = ? AND is_active", [this.p.category]);
-    if (cat === null) return null;
-    const hasChildren = await this.db.scalar("SELECT 1 FROM categories WHERE parent_id = ? LIMIT 1", [cat.id]);
-    return Number(hasChildren || cat.parent_id === null ? cat.id : cat.parent_id);
+  /**
+   * Category ids for the filter, looked up once per search (the database may be far away, so every
+   * round trip counts). `scope` is for the category facet: a parent category shows its children, a
+   * leaf shows its siblings. Empty when the category does not exist.
+   */
+  private categoryIds(scope: boolean): Promise<number[]> {
+    const memo = scope ? "scopeIds" : "filterIds";
+    this[memo] ??= this.db
+      .all(
+        `WITH RECURSIVE root AS (
+           SELECT CASE WHEN ?::boolean AND c.parent_id IS NOT NULL
+                        AND NOT EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = c.id)
+                       THEN c.parent_id ELSE c.id END AS id
+           FROM categories c WHERE c.slug = ? AND c.is_active),
+         tree(id) AS (SELECT id FROM root UNION ALL SELECT c.id FROM categories c JOIN tree t ON c.parent_id = t.id)
+         SELECT id FROM tree`,
+        [scope, this.p.category],
+      )
+      .then((rows) => rows.map((r) => Number(r.id)));
+    return this[memo]!;
   }
+
+  private filterIds?: Promise<number[]>;
+  private scopeIds?: Promise<number[]>;
 
   private async where(exclude: string | null = null): Promise<[string[], unknown[]]> {
     const clauses = ["p.status = 'active'", "s.kyc_status = 'approved'"];
     const params: unknown[] = [];
     const p = this.p;
     if (p.category) {
-      let scope: number | null;
-      if (exclude === "category") {
-        scope = await this.categoryScope();
-      } else {
-        const cat = await this.db.one("SELECT id FROM categories WHERE slug = ? AND is_active", [p.category]);
-        scope = cat ? cat.id : -1;
-      }
-      if (scope !== null) {
-        const ids = scope !== -1 ? await categoryDescendants(this.db, scope) : [-1];
-        clauses.push(`p.category_id IN (${placeholders(ids)})`);
-        params.push(...ids);
+      const ids = await this.categoryIds(exclude === "category");
+      // An unknown category matches nothing, except in its own facet, which then shows all categories.
+      if (ids.length || exclude !== "category") {
+        const list = ids.length ? ids : [-1];
+        clauses.push(`p.category_id IN (${placeholders(list)})`);
+        params.push(...list);
       }
     }
     if (p.brands.length && exclude !== "brand") {
@@ -246,17 +257,23 @@ export class Search {
   // -- execution -----------------------------------------------------------------------------
 
   async run() {
+    // Category ids are fetched alongside the variant / model lookup rather than after it.
+    if (this.p.category) {
+      void this.categoryIds(false).catch(() => {});
+      void this.categoryIds(true).catch(() => {});
+    }
     await this.init();
     let mode: Mode = "and";
-    let result = await this.page(mode);
+    // Results and facets are independent queries: run them together.
+    let [result, facets] = await Promise.all([this.page(mode), this.facets(mode)]);
     if (result.total === 0 && this.tokens.length > 1 && !this.partNorm) {
       this.relaxed = true;
       mode = "or";
-      result = await this.page(mode);
+      [result, facets] = await Promise.all([this.page(mode), this.facets(mode)]);
     }
     return {
       ...result,
-      facets: await this.facets(mode),
+      facets,
       relaxed: this.relaxed,
       vehicle: this.variant,
       detected_model: this.detectedModel,
@@ -265,14 +282,17 @@ export class Search {
 
   private async page(mode: Mode) {
     const [cte, where, params] = await this.from(mode);
-    const total = Number((await this.db.scalar(`${cte}SELECT COUNT(*)${BASE_FROM}${where}`, params as Params)) ?? 0);
     const perPage = Math.min(Math.max(this.p.perPage, 1), 60);
     const page = Math.max(this.p.page, 1);
-    const rows = await this.db.all(`${cte}${PRODUCT_CARD_SELECT}${where} ORDER BY ${this.order()} LIMIT ? OFFSET ?`, [
-      ...params,
-      perPage,
-      (page - 1) * perPage,
+    const [count, rows] = await Promise.all([
+      this.db.scalar(`${cte}SELECT COUNT(*)${BASE_FROM}${where}`, params as Params),
+      this.db.all(`${cte}${PRODUCT_CARD_SELECT}${where} ORDER BY ${this.order()} LIMIT ? OFFSET ?`, [
+        ...params,
+        perPage,
+        (page - 1) * perPage,
+      ]),
     ]);
+    const total = Number(count ?? 0);
     const variantId = this.variant ? this.variant.id : null;
     let items: ReturnType<typeof cardOut>[];
     if (variantId) {
@@ -295,23 +315,25 @@ export class Search {
   }
 
   private async facets(mode: Mode) {
-    let [cte, where, params] = await this.from(mode, "brand");
-    const brands = await this.db.all(
-      `${cte}SELECT b.slug, b.name, b.is_oem, COUNT(*) AS count${BASE_FROM}${where}` +
-        " GROUP BY b.id ORDER BY count DESC, b.name LIMIT 30",
-      params,
-    );
-    [cte, where, params] = await this.from(mode, "category");
-    const categories = await this.db.all(
-      `${cte}SELECT c.slug, c.name, COUNT(*) AS count${BASE_FROM}${where}` +
-        " GROUP BY c.id ORDER BY count DESC, c.name LIMIT 30",
-      params,
-    );
-    [cte, where, params] = await this.from(mode);
-    const price = (await this.db.one(
-      `${cte}SELECT MIN(p.price_paise) AS min, MAX(p.price_paise) AS max${BASE_FROM}${where}`,
-      params,
-    )) ?? { min: null, max: null };
+    const [brandQ, categoryQ, priceQ] = await Promise.all([
+      this.from(mode, "brand"),
+      this.from(mode, "category"),
+      this.from(mode),
+    ]);
+    const [brands, categories, priceRow] = await Promise.all([
+      this.db.all(
+        `${brandQ[0]}SELECT b.slug, b.name, b.is_oem, COUNT(*) AS count${BASE_FROM}${brandQ[1]}` +
+          " GROUP BY b.id ORDER BY count DESC, b.name LIMIT 30",
+        brandQ[2],
+      ),
+      this.db.all(
+        `${categoryQ[0]}SELECT c.slug, c.name, COUNT(*) AS count${BASE_FROM}${categoryQ[1]}` +
+          " GROUP BY c.id ORDER BY count DESC, c.name LIMIT 30",
+        categoryQ[2],
+      ),
+      this.db.one(`${priceQ[0]}SELECT MIN(p.price_paise) AS min, MAX(p.price_paise) AS max${BASE_FROM}${priceQ[1]}`, priceQ[2]),
+    ]);
+    const price = priceRow ?? { min: null, max: null };
     return {
       brands: brands.map((b) => ({ slug: b.slug, name: b.name, is_oem: Boolean(b.is_oem), count: b.count })),
       categories: categories.map((c) => ({ slug: c.slug, name: c.name, count: c.count })),

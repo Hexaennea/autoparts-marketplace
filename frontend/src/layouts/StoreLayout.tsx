@@ -7,6 +7,7 @@ import { Link, useRouter } from "../lib/router";
 import type { Category, ProductCard } from "../lib/types";
 import { useAuth, useCart, useConfig, useToast, useVehicle } from "../state/app";
 import { MyCarDialog } from "../ui/vehicle";
+import { NotificationBell } from "../ui/notifications";
 
 export function Logo({ inverse }: { inverse?: boolean }) {
   const { app_name } = useConfig();
@@ -162,6 +163,7 @@ export function StoreLayout({ children }: { children: ReactNode }) {
               <LuCar aria-hidden="true" />
               <span>{vehicle ? `${vehicle.variant.model} ${vehicle.variant.name.split(" ")[0]} · ${vehicle.year}` : <>My car<span className="plate__long"> — select</span></>}</span>
             </button>
+            <NotificationBell />
             <AccountMenu />
             <Link to="/cart" className="hdr-action hdr-cart" aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}>
               <LuShoppingCart aria-hidden="true" />

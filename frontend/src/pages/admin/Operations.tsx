@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LuCircleCheck, LuExternalLink, LuWallet } from "react-icons/lu";
+import { LuCircleCheck, LuDownload, LuExternalLink, LuWallet } from "react-icons/lu";
 import { api, ApiError, errorMessage } from "../../lib/api";
 import { date, dateTime, paiseToInput, parseRupees, percentOff, relative, rupees, warranty, rupeesRounded } from "../../lib/format";
 import { invalidate, useQuery } from "../../lib/query";
@@ -8,6 +8,7 @@ import type { Order, Paged, Variant } from "../../lib/types";
 import { useToast } from "../../state/app";
 import { FALLBACK_ART, StatusBadge, SummaryRows, TrackingRoute } from "../../ui/commerce";
 import { Alert, Badge, Button, Card, Dialog, ErrorState, Field, PageHeader, Pagination, Skeleton, Tabs } from "../../ui/core";
+import { RefreshButton } from "../../ui/refresh";
 import { SearchBar, useSearchText } from "./People";
 
 /* ---------------- listing moderation ---------------- */
@@ -150,14 +151,15 @@ export function AdminOrdersPage() {
   const [text, setText, params, update] = useSearchText();
   const status = params.get("status") ?? "";
   const page = Number(params.get("page") ?? 1) || 1;
-  const q = useQuery<Paged<OrderRow>>("/api/admin/orders", { status, q: params.get("q") ?? "", page });
+  const q = useQuery<Paged<OrderRow> & { counts?: Record<string, number> }>("/api/admin/orders", { status, q: params.get("q") ?? "", page });
+  const c = q.data?.counts ?? {};
   const d = q.data;
   return (
     <>
-      <PageHeader title="Orders" />
+      <PageHeader title="Orders" actions={<RefreshButton onRefresh={async () => { await q.refresh(); invalidate("/api/admin/dashboard"); }} />} />
       <Card>
         <Tabs label="Shipment status" value={status} onChange={(s) => update({ status: s || null, page: null })}
-          items={[{ value: "", label: "All" }, { value: "placed", label: "To pack" }, { value: "shipped", label: "Shipped" }, { value: "delivered", label: "Delivered" }, { value: "return_requested", label: "Returns" }, { value: "cancelled", label: "Cancelled" }, { value: "pending_payment", label: "Unpaid" }]} />
+          items={[{ value: "", label: "All", count: c.all }, { value: "to_ship", label: "To ship", count: c.to_ship }, { value: "shipped", label: "Shipped", count: c.shipped }, { value: "delivered", label: "Delivered", count: c.delivered }, { value: "returns", label: "Returns", count: c.returns }, { value: "cancelled", label: "Cancelled", count: c.cancelled }, { value: "unpaid", label: "Unpaid", count: c.unpaid }]} />
         <SearchBar value={text} onChange={setText} placeholder="Order number, buyer name or email" />
         {!d && <div className="card__body"><Skeleton height={200} /></div>}
         {d && (
@@ -197,7 +199,7 @@ export function AdminOrderPage({ id }: { id: number }) {
   if (!o) return <Skeleton height={400} />;
   return (
     <>
-      <PageHeader title={<>Order <span className="pn">{o.number}</span></>} subtitle={`${dateTime(o.created_at)} · ${o.buyer?.name} (${o.buyer?.email})`} back={{ to: "/admin/orders", label: "Orders" }} />
+      <PageHeader title={<>Order <span className="pn">{o.number}</span></>} subtitle={`${dateTime(o.created_at)} · ${o.buyer?.name} (${o.buyer?.email})`} back={{ to: "/admin/orders", label: "Orders" }} actions={<RefreshButton onRefresh={() => q.refresh()} />} />
       <div className="grid-2">
         <div className="stack-lg">
           {o.fulfilments.map((f) => (
@@ -211,6 +213,7 @@ export function AdminOrderPage({ id }: { id: number }) {
                 {f.cancel_reason && <Alert kind="bad" title="Cancelled">{f.cancel_reason}</Alert>}
                 {f.return_reason && <Alert kind="warn" title="Return reason">{f.return_reason}</Alert>}
                 <div className="row row--wrap">
+                  {f.invoice_number && <a className="btn btn--secondary btn--sm" href={`/api/admin/fulfilments/${f.id}/invoice.pdf`} download><LuDownload aria-hidden="true" /> Invoice <span className="pn">{f.invoice_number}</span></a>}
                   {f.status === "shipped" && <Button size="sm" busy={busy === `${f.id}-deliver`} onClick={() => void act(f.id, "deliver")}>Mark delivered</Button>}
                   {f.status === "return_requested" && <><Button size="sm" variant="primary" busy={busy === `${f.id}-accept_return`} onClick={() => void act(f.id, "accept_return")}>Accept return</Button><Button size="sm" onClick={() => void act(f.id, "reject_return", { reason: "Declined after admin review." })}>Decline return</Button></>}
                   {(f.status === "placed" || f.status === "packed") && <Button size="sm" variant="danger" onClick={() => setCancelId(f.id)}>Cancel shipment</Button>}

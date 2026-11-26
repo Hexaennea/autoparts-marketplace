@@ -1,9 +1,10 @@
-import { LuChartColumn, LuFileSpreadsheet, LuPackage, LuSettings, LuTag, LuWallet } from "react-icons/lu";
+import { LuBell, LuChartColumn, LuFileSpreadsheet, LuPackage, LuSettings, LuTag, LuWallet } from "react-icons/lu";
 import { PortalLayout } from "../../layouts/PortalLayout";
 import { useQuery } from "../../lib/query";
 import { Routes } from "../../lib/router";
 import { useAuth } from "../../state/app";
 import { Alert } from "../../ui/core";
+import { NotificationsPage, useUnreadCount } from "../../ui/notifications";
 import { NotFound } from "../store/NotFound";
 import { SellerDashboard } from "./Dashboard";
 import { ImportPage } from "./Import";
@@ -17,6 +18,7 @@ export default function SellerApp() {
   const { user } = useAuth();
   const counts = useQuery<{ kpis: { to_ship: number; returns_open: number } }>("/api/seller/dashboard");
   const status = user?.seller?.status;
+  const unread = useUnreadCount();
   const banner =
     status && status !== "approved" ? (
       <div className="portal-banner">
@@ -39,6 +41,7 @@ export default function SellerApp() {
         { to: "/seller/listings", label: "Listings", icon: LuTag },
         { to: "/seller/import", label: "Bulk import", icon: LuFileSpreadsheet },
         { to: "/seller/payouts", label: "Payouts", icon: LuWallet },
+        { to: "/seller/notifications", label: "Notifications", icon: LuBell, badge: unread || undefined },
         { to: "/seller/settings", label: "Shop settings", icon: LuSettings },
       ]}
     >
@@ -54,6 +57,7 @@ export default function SellerApp() {
           { path: "/seller/import", render: () => <ImportPage /> },
           { path: "/seller/payouts", render: () => <PayoutsPage /> },
           { path: "/seller/settings", render: () => <SellerSettings /> },
+          { path: "/seller/notifications", render: () => <NotificationsPage /> },
         ]}
       />
     </PortalLayout>

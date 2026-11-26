@@ -9,6 +9,10 @@ export interface User {
   full_name: string;
   phone: string | null;
   role: Role;
+  /** Admins only: may manage other admin accounts. */
+  is_super_admin?: boolean;
+  /** Someone else chose this password; the admin portal asks for a new one first. */
+  must_change_password?: boolean;
   created_at: string;
   seller: { id: number; status: KycStatus; display_name: string; note: string | null } | null;
 }
@@ -224,6 +228,7 @@ export interface Fulfilment {
   refund_paise: number;
   shipped_at: string | null;
   delivered_at: string | null;
+  invoice_number: string | null;
   items: OrderItem[];
   events: { status: string; note: string | null; created_at: string; label: string }[];
   can_cancel?: boolean;
@@ -254,3 +259,13 @@ export interface Order {
 export interface GarageEntry { id: number; year: number; nickname: string | null; variant: Variant; label: string }
 
 export interface AppConfig { app_name: string; demo_mode: boolean; payments_test_mode: boolean }
+
+export interface AppNotification {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}
